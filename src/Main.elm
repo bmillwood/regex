@@ -8,46 +8,53 @@ import Html.Events as Events
 import Parser
 
 import Regex exposing (Regex)
+import Regex.Explain
+import Regex.Parser
 
 type alias Model =
   { unparsed : String
-  , parsed : Result (List Parser.DeadEnd) Regex
+  , lastParsed : Regex
+  , error : Maybe (List Parser.DeadEnd)
   }
 
 type Msg
   = Input String
 
-modelOfUnparsed : String -> Model
-modelOfUnparsed unparsed =
-  { unparsed = unparsed
-  , parsed = Parser.run Regex.parser unparsed
-  }
-
-parsedToString : Result (List Parser.DeadEnd) Regex -> String
-parsedToString = Debug.toString
-
 init : Model
-init = modelOfUnparsed ""
+init =
+  { unparsed = ""
+  , lastParsed = Regex.empty
+  , error = Nothing
+  }
 
 view : Model -> Html Msg
 view model =
+  let
+    maybeStyle =
+      case model.error of
+        Just _ -> [ Attributes.style "background-color" "#fcc" ]
+        Nothing -> []
+    inputAttributes =
+      [ Attributes.type_ "text"
+      , Attributes.value model.unparsed
+      , Events.onInput Input
+      ] ++ maybeStyle
+  in
   Html.div []
-    [ Html.p []
-        [ Html.input
-            [ Attributes.type_ "text"
-            , Attributes.name "regex"
-            , Attributes.value model.unparsed
-            , Events.onInput Input
-            ]
-            []
-        ]
-    , Html.p []
-        [ Html.text (parsedToString model.parsed)
-        ]
+    [ Html.p [] [ Html.input inputAttributes [] ]
+    , Html.p [] [ Regex.Explain.explainRegex model.lastParsed ]
     ]
 
 update : Msg -> Model -> Model
-update (Input input) _ = modelOfUnparsed input
+update (Input input) model =
+  case Parser.run Regex.Parser.parser input of
+    Ok newRegex ->
+      { unparsed = input, lastParsed = newRegex, error = Nothing }
+    Err error ->
+      { unparsed = input
+      , lastParsed = model.lastParsed
+      , error = Just error
+      }
 
 main =
   Browser.sandbox
