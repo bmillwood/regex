@@ -9,13 +9,13 @@ type Atom
   = Literal Char
   | CharacterClass { negated : Bool, atoms : List CharClassAtom }
   | Capture Regex
-  | Repeat Atom Repetition
+  | Repeat Repetition Atom
 
 type CharClassAtom
   = CCLiteral Char
   | CCRange Char Char
 
 type alias Repetition =
-  { min : Maybe Int
+  { min : Int
   , max : Maybe Int
   }

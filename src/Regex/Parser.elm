@@ -29,16 +29,31 @@ parser =
 
 atomParser : Parser Regex.Atom
 atomParser =
-  Parser.lazy (\ () ->
-    Parser.oneOf
-      [ Parser.map Regex.CharacterClass characterClass
-      , Parser.succeed Regex.Capture
-          |. Parser.symbol "("
-          |= parser
-          |. Parser.symbol ")"
-      , backslashEscape
-      , Parser.map Regex.Literal plainLiteral
-      ])
+  let
+    withoutRepetition =
+      Parser.oneOf
+        [ Parser.map Regex.CharacterClass characterClass
+        , Parser.succeed Regex.Capture
+            |. Parser.symbol "("
+            |= Parser.lazy (\ () -> parser)
+            |. Parser.symbol ")"
+        , backslashEscape
+        , Parser.map Regex.Literal plainLiteral
+        ]
+  in
+  Parser.succeed (\atom f -> f atom)
+    |= withoutRepetition
+    |= maybeRepeat
+
+maybeRepeat : Parser (Regex.Atom -> Regex.Atom)
+maybeRepeat =
+  Parser.oneOf
+    [ Parser.succeed (Regex.Repeat { min = 0, max = Nothing })
+        |. Parser.symbol "*"
+    , Parser.succeed (Regex.Repeat { min = 1, max = Nothing })
+        |. Parser.symbol "+"
+    , Parser.succeed identity
+    ]
 
 characterClass : Parser { negated : Bool, atoms : List Regex.CharClassAtom }
 characterClass =
