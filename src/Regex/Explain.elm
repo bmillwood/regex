@@ -15,7 +15,7 @@ explainDisjuncts ds =
     [] -> [ Html.text "empty regex (matches nothing)" ]
     [ d ] -> explainDisjunct d
     _ ->
-      [ Html.text "one of:"
+      [ Html.text "any of:"
       , Html.ul [] (List.map (Html.li [] << explainDisjunct) ds)
       ]
 
@@ -58,6 +58,8 @@ explainAtom : Regex.Atom -> List (Html a)
 explainAtom atom =
   case atom of
     Regex.Literal c ->
+      -- NB. despite squeezeAtoms, this case is reachable, because
+      -- we only bother squeezing when we have a sequence
       [ Html.text ("the character " ++ Debug.toString c) ]
     Regex.CharacterClass cc -> explainCharacterClass cc
     Regex.Capture r -> explainDisjuncts r
@@ -139,6 +141,13 @@ explainRepetition { min, max } atom =
       then
         [ Html.text "exactly "
         , Html.text (prettyNumber min)
+        , Html.text " of:"
+        , explanation
+        ]
+      else if min == 0
+      then
+        [ Html.text "at most "
+        , Html.text (prettyNumber m)
         , Html.text " of:"
         , explanation
         ]

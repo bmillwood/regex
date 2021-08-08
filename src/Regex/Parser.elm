@@ -40,19 +40,57 @@ atomParser =
         , backslashEscape
         , Parser.map Regex.Literal plainLiteral
         ]
+    applyRepeat atom maybeRep =
+      case maybeRep of
+        Nothing -> atom
+        Just rep -> Regex.Repeat rep atom
   in
-  Parser.succeed (\atom f -> f atom)
+  Parser.succeed applyRepeat
     |= withoutRepetition
     |= maybeRepeat
 
-maybeRepeat : Parser (Regex.Atom -> Regex.Atom)
+type RepeatMax
+  = This (Maybe Int)
+  | SameAsMin
+
+maybeRepeat : Parser (Maybe Regex.Repetition)
 maybeRepeat =
+  let
+    parseNumberedRepeat =
+      Parser.oneOf
+        [ Parser.succeed (\m -> { min = 0, max = Just m })
+            |. Parser.symbol ","
+            |= Parser.int
+        , Parser.succeed applyMax
+            |= Parser.int
+            |= getMax
+        ]
+    getMax =
+      Parser.oneOf
+        [ Parser.succeed This
+            |. Parser.symbol ","
+            |= Parser.oneOf
+                [ Parser.succeed Just
+                    |= Parser.int
+                , Parser.succeed Nothing
+                ]
+        , Parser.succeed SameAsMin
+        ]
+    applyMax min repeatMax =
+      case repeatMax of
+        This max -> { min = min, max = max }
+        SameAsMin -> { min = min, max = Just min }
+  in
   Parser.oneOf
-    [ Parser.succeed (Regex.Repeat { min = 0, max = Nothing })
+    [ Parser.succeed (Just { min = 0, max = Nothing })
         |. Parser.symbol "*"
-    , Parser.succeed (Regex.Repeat { min = 1, max = Nothing })
+    , Parser.succeed (Just { min = 1, max = Nothing })
         |. Parser.symbol "+"
-    , Parser.succeed identity
+    , Parser.succeed Just
+        |. Parser.symbol "{"
+        |= parseNumberedRepeat
+        |. Parser.symbol "}"
+    , Parser.succeed Nothing
     ]
 
 characterClass : Parser { negated : Bool, atoms : List Regex.CharClassAtom }
