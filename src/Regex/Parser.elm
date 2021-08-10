@@ -86,6 +86,8 @@ maybeRepeat =
         |. Parser.symbol "*"
     , Parser.succeed (Just { min = 1, max = Nothing })
         |. Parser.symbol "+"
+    , Parser.succeed (Just { min = 0, max = Just 1 })
+        |. Parser.symbol "?"
     , Parser.succeed Just
         |. Parser.symbol "{"
         |= parseNumberedRepeat
