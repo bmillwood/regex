@@ -27,6 +27,8 @@ update (SetCases cases) model =
 regressionTests : List Regex
 regressionTests =
   [ [[ Regex.Repeat (Regex.Repeat (Regex.Capture Regex.empty) Regex.ZeroOrMore) Regex.ZeroOrMore ]]
+  , [[ Regex.CharMatching Regex.MatchAny, Regex.CharMatching (Regex.MatchLit '?') ]]
+  , [[ Regex.Repeat (Regex.Capture Regex.empty) (Regex.Range { min = Nothing, max = Nothing }) ]]
   ]
 
 type alias TestRow a =
