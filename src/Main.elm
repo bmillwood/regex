@@ -4,6 +4,7 @@ import Browser
 import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
+import Json.Decode
 import Parser
 
 import Regex exposing (Regex)
@@ -20,12 +21,14 @@ type Msg
   = SetInput String
   | SetRegex Regex
 
-init : Model
-init =
-  { unparsed = ""
-  , lastParsed = Regex.empty
-  , error = Nothing
-  }
+init : Json.Decode.Value -> (Model, Cmd Msg)
+init flags =
+  ( { unparsed = ""
+    , lastParsed = Regex.empty
+    , error = Nothing
+    }
+  , Cmd.none
+  )
 
 view : Model -> Html Msg
 view model =
@@ -45,27 +48,37 @@ view model =
     , Html.p [] [ Regex.Explain.explainRegex model.lastParsed ]
     ]
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     SetInput input ->
       case Parser.run Regex.Parser.parser input of
         Ok newRegex ->
-          { unparsed = input, lastParsed = newRegex, error = Nothing }
+          ( { unparsed = input, lastParsed = newRegex, error = Nothing }
+          , Cmd.none
+          )
         Err error ->
-          { unparsed = input
-          , lastParsed = model.lastParsed
-          , error = Just error
-          }
+          ( { unparsed = input
+            , lastParsed = model.lastParsed
+            , error = Just error
+            }
+          , Cmd.none
+          )
     SetRegex regex ->
-      { unparsed = Regex.toString regex
-      , lastParsed = regex
-      , error = Nothing
-      }
+      ( { unparsed = Regex.toString regex
+        , lastParsed = regex
+        , error = Nothing
+        }
+      , Cmd.none
+      )
+
+subscriptions : Model -> Sub Msg
+subscriptions _ = Sub.none
 
 main =
-  Browser.sandbox
+  Browser.element
     { init          = init
     , view          = view
     , update        = update
+    , subscriptions = subscriptions
     }
