@@ -8,15 +8,26 @@ import Regex exposing (Regex)
 import Regex.Gen
 import Regex.Parser
 
-type alias Model = { cases : List Regex }
+type alias Model = { fuzzCases : List Regex }
 type Msg = SetCases (List Regex)
 
 init : (Model, Cmd Msg)
 init =
-  ( { cases = [] }
+  ( { fuzzCases = [] }
   , Random.generate SetCases
       (Random.list 10 (Regex.Gen.regex { size = 10 }))
   )
+
+update : Msg -> Model -> (Model, Cmd Msg)
+update (SetCases cases) model =
+  ( { model | fuzzCases = cases }
+  , Cmd.none
+  )
+
+regressionTests : List Regex
+regressionTests =
+  [ [[ Regex.Repeat Regex.ZeroOrMore (Regex.Repeat Regex.ZeroOrMore (Regex.Capture Regex.empty)) ]]
+  ]
 
 type alias TestRow a =
   { pass : Html a
@@ -38,7 +49,7 @@ toRowGen mkCell { pass, input, toString, parsed, reString } =
     ]
 
 view : Model -> Html Msg
-view { cases } =
+view { fuzzCases } =
   let
     header =
       toRowGen
@@ -51,11 +62,20 @@ view { cases } =
         }
 
     toRow input = toRowGen (Html.td []) (testRegex input)
+
+    table cases =
+      Html.table
+        []
+        [ Html.thead [] [ header ]
+        , Html.tbody [] (List.map toRow cases)
+        ]
   in
-  Html.table
+  Html.div
     []
-    [ Html.thead [] [ header ]
-    , Html.tbody [] (List.map toRow cases)
+    [ Html.h1 [] [ Html.text "Fuzz tests" ]
+    , table fuzzCases
+    , Html.h1 [] [ Html.text "Regression tests" ]
+    , table regressionTests
     ]
 
 testRegex : Regex -> TestRow a
@@ -83,9 +103,3 @@ testRegex regex =
   , parsed = parsed
   , reString = Html.text reString
   }
-
-update : Msg -> Model -> (Model, Cmd Msg)
-update (SetCases cases) _ =
-  ( { cases = cases }
-  , Cmd.none
-  )
