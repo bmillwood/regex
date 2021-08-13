@@ -18,32 +18,32 @@ explainDisjuncts ds =
       , Html.ul [] (List.map (Html.li [] << explainDisjunct) ds)
       ]
 
-explainDisjunct : List Regex.Atom -> List (Html a)
-explainDisjunct atoms =
+explainDisjunct : List Regex.Piece -> List (Html a)
+explainDisjunct pieces =
   let
-    explainSAtom satom =
-      case satom of
+    explainSqueezed squeezed =
+      case squeezed of
         Literals s ->
           [ Html.text ("the string " ++ Debug.toString s) ]
-        Other atom -> explainAtom atom
+        Other piece -> explainPiece piece
   in
-  case squeezeAtoms atoms of
+  case squeeze pieces of
     [] -> [ Html.text "the empty string" ]
-    [ satom ] -> explainSAtom satom
-    satoms ->
+    [ squeezed ] -> explainSqueezed squeezed
+    squeezeds ->
       [ Html.text "a sequence of:"
-      , Html.ul [] (List.map (Html.li [] << explainSAtom) satoms)
+      , Html.ul [] (List.map (Html.li [] << explainSqueezed) squeezeds)
       ]
 
-type SqueezedAtom
+type Squeezed
   = Literals String
-  | Other Regex.Atom
+  | Other Regex.Piece
 
-squeezeAtoms : List Regex.Atom -> List SqueezedAtom
-squeezeAtoms =
+squeeze : List Regex.Piece -> List Squeezed
+squeeze =
   let
-    f atom acc =
-      case (atom, acc) of
+    f piece acc =
+      case (piece, acc) of
         (Regex.CharMatching (Regex.MatchLit c), Literals s :: rest) ->
           Literals (String.cons c s) :: rest
         (Regex.CharMatching (Regex.MatchLit c), others) ->
@@ -53,9 +53,9 @@ squeezeAtoms =
   in
   List.foldr f []
 
-explainAtom : Regex.Atom -> List (Html a)
-explainAtom atom =
-  case atom of
+explainPiece : Regex.Piece -> List (Html a)
+explainPiece piece =
+  case piece of
     Regex.StartOfInput -> [ Html.text "the start of the string" ]
     Regex.EndOfInput -> [ Html.text "the end of the string" ]
     Regex.CharMatching cm -> explainCharMatch cm
@@ -67,7 +67,7 @@ explainCharMatch : Regex.CharMatch -> List (Html a)
 explainCharMatch match =
   case match of
     Regex.MatchLit c ->
-      -- NB. despite squeezeAtoms, this case is reachable, because
+      -- NB. despite squeeze, this case is reachable, because
       -- we only bother squeezing when we have a sequence
       [ Html.text ("the character " ++ Debug.toString c) ]
     Regex.MatchAny -> [ Html.text "any character" ]
@@ -85,7 +85,7 @@ explainMatchClass { negated, matchAtoms } =
         bit :: others ->
           bit :: beforeEach :: orText beforeEach beforeLast others
     explained =
-      case partitionCCAtoms matchAtoms of
+      case partitionClassAtoms matchAtoms of
         (lits, ranges) ->
           List.concat
             [ List.map Html.text
@@ -116,19 +116,19 @@ explainMatchClass { negated, matchAtoms } =
   , Html.text (if negated then "not " else "")
   ] ++ explained
 
-partitionCCAtoms
+partitionClassAtoms
   : List Regex.ClassAtom -> (List Char, List (Char, Char))
-partitionCCAtoms =
+partitionClassAtoms =
   let
-    f ccatom (lits, ranges) =
-      case ccatom of
+    f classAtom (lits, ranges) =
+      case classAtom of
         Regex.ClassLit c -> (c :: lits, ranges)
         Regex.ClassRange c1 c2 -> (lits, (c1, c2) :: ranges)
   in
   List.foldr f ([], [])
 
-explainRepetition : Regex.Repetition -> Regex.Atom -> List (Html a)
-explainRepetition repetition atom =
+explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html a)
+explainRepetition piece repetition =
   let
     (min, max) =
       case repetition of
@@ -142,7 +142,7 @@ explainRepetition repetition atom =
         0 -> "zero"
         1 -> "one"
         _ -> String.fromInt n
-    explanation = Html.ul [] [ Html.li [] (explainAtom atom) ]
+    explanation = Html.ul [] [ Html.li [] (explainPiece piece) ]
   in
   case max of
     Nothing ->

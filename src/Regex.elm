@@ -3,17 +3,17 @@ module Regex exposing (..)
 import Dict exposing (Dict)
 import Set exposing (Set)
 
-type alias Regex = List (List Atom)
+type alias Regex = List (List Piece)
 
 empty : Regex
 empty = [[]]
 
-type Atom
+type Piece
   = StartOfInput
   | EndOfInput
   | CharMatching CharMatch
   | Capture Regex
-  | Repeat Repetition Atom
+  | Repeat Piece Repetition
 
 type CharMatch
   = MatchLit Char
@@ -38,7 +38,7 @@ reservedChars : Set Char
 reservedChars =
   Set.fromList [ '\\', '|', '(', ')', '[', ']', '^', '$', '.' ]
 
-backslashEscapes : Dict Char Atom
+backslashEscapes : Dict Char Piece
 backslashEscapes =
   Dict.fromList
     [ ('n', CharMatching (MatchLit '\n'))
@@ -57,17 +57,17 @@ toString regex =
   case regex of
     [] -> "$."
     alts ->
-      List.map (String.concat << List.map atomToString) alts
+      List.map (String.concat << List.map pieceToString) alts
       |> String.join "|"
 
-atomToString : Atom -> String
-atomToString atom =
-  case atom of
+pieceToString : Piece -> String
+pieceToString piece =
+  case piece of
     StartOfInput -> "^"
     EndOfInput -> "$"
     CharMatching match -> charMatchToString match
     Capture c -> "(" ++ toString c ++ ")"
-    Repeat r a ->
+    Repeat a r ->
       let
         maybeIntToString =
           Maybe.withDefault "" << Maybe.map String.fromInt
@@ -86,7 +86,7 @@ atomToString atom =
                 , "}"
                 ]
       in
-      atomToString a ++ repeatString
+      pieceToString a ++ repeatString
 
 charMatchToString : CharMatch -> String
 charMatchToString cm =

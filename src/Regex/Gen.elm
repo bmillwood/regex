@@ -8,19 +8,19 @@ regex : { size : Int } -> Random.Generator Regex
 regex { size } =
   partition { size = size }
   |> Random.andThen (\sizes ->
-        randomMap (\subSize -> atoms { size = subSize }) sizes
+        randomMap (\subSize -> pieces { size = subSize }) sizes
       )
 
-atoms : { size : Int } -> Random.Generator (List Regex.Atom)
-atoms { size } =
+pieces : { size : Int } -> Random.Generator (List Regex.Piece)
+pieces { size } =
   partition { size = size }
   |> Random.andThen (\sizes ->
-        randomMap (\subSize -> atom { size = subSize }) sizes
+        randomMap (\subSize -> piece { size = subSize }) sizes
       )
   |> Random.andThen shuffle
 
-atom : { size : Int } -> Random.Generator Regex.Atom
-atom { size } =
+piece : { size : Int } -> Random.Generator Regex.Piece
+piece { size } =
   if size <= 1
   then Random.uniform Regex.StartOfInput [ Regex.EndOfInput ]
   else
@@ -31,8 +31,8 @@ atom { size } =
           (Random.lazy (\ () -> regex { size = size - 1 }))
       , Random.map2
           Regex.Repeat
+          (Random.lazy (\ () -> piece { size = size - 1 }))
           repetition
-          (Random.lazy (\ () -> atom { size = size - 1 }))
       ]
     |> Random.andThen identity
 

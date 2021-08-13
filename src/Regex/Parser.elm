@@ -15,7 +15,7 @@ parser =
         , separator = ""
         , end = ""
         , spaces = Parser.succeed ()
-        , item = atomParser
+        , item = pieceParser
         , trailing = Parser.Forbidden
         }
   in
@@ -28,8 +28,8 @@ parser =
     , trailing = Parser.Forbidden
     }
 
-atomParser : Parser Regex.Atom
-atomParser =
+pieceParser : Parser Regex.Piece
+pieceParser =
   let
     withoutRepetition =
       Parser.oneOf
@@ -44,22 +44,31 @@ atomParser =
             |. Parser.symbol ")"
         , backslashEscape
         ]
-    applyRepeat atom maybeRep =
-      case maybeRep of
-        Nothing -> atom
-        Just rep -> Regex.Repeat rep atom
   in
-  Parser.succeed applyRepeat
+  Parser.succeed (List.foldl (\rep piece -> Regex.Repeat piece rep))
     |= withoutRepetition
-    |= maybeRepeat
+    |= repeats
 
 type RepeatMax
   = This (Maybe Int)
   | ExactlyMin
 
-maybeRepeat : Parser (Maybe Regex.Repetition)
-maybeRepeat =
+repeats : Parser (List Regex.Repetition)
+repeats =
   let
+    repeat =
+      Parser.oneOf
+        [ Parser.succeed Regex.ZeroOrMore
+            |. Parser.symbol "*"
+        , Parser.succeed Regex.OneOrMore
+            |. Parser.symbol "+"
+        , Parser.succeed Regex.Optional
+            |. Parser.symbol "?"
+        , Parser.succeed identity
+            |. Parser.symbol "{"
+            |= parseNumberedRepeat
+            |. Parser.symbol "}"
+        ]
     parseNumberedRepeat =
       Parser.oneOf
         [ Parser.succeed (\m -> Regex.Range { min = Nothing, max = Just m })
@@ -69,6 +78,10 @@ maybeRepeat =
             |= Parser.int
             |= getMax
         ]
+    applyMax min repeatMax =
+      case repeatMax of
+        This max -> Regex.Range { min = Just min, max = max }
+        ExactlyMin -> Regex.Exactly min
     getMax =
       Parser.oneOf
         [ Parser.succeed This
@@ -80,24 +93,15 @@ maybeRepeat =
                 ]
         , Parser.succeed ExactlyMin
         ]
-    applyMax min repeatMax =
-      case repeatMax of
-        This max -> Regex.Range { min = Just min, max = max }
-        ExactlyMin -> Regex.Exactly min
   in
-  Parser.oneOf
-    [ Parser.succeed (Just Regex.ZeroOrMore)
-        |. Parser.symbol "*"
-    , Parser.succeed (Just Regex.OneOrMore)
-        |. Parser.symbol "+"
-    , Parser.succeed (Just Regex.Optional)
-        |. Parser.symbol "?"
-    , Parser.succeed Just
-        |. Parser.symbol "{"
-        |= parseNumberedRepeat
-        |. Parser.symbol "}"
-    , Parser.succeed Nothing
-    ]
+  Parser.sequence
+    { start = ""
+    , separator = ""
+    , end = ""
+    , spaces = Parser.succeed ()
+    , item = repeat
+    , trailing = Parser.Forbidden
+    }
 
 charMatch : Parser Regex.CharMatch
 charMatch =
@@ -150,7 +154,7 @@ oneChar p =
 plainLiteral : Parser Char
 plainLiteral = oneChar (\c -> not (Set.member c Regex.reservedChars))
 
-backslashEscape : Parser Regex.Atom
+backslashEscape : Parser Regex.Piece
 backslashEscape =
   Parser.succeed identity
     |. Parser.symbol "\\"
