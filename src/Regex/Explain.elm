@@ -121,8 +121,15 @@ partitionCCAtoms =
   List.foldr f ([], [])
 
 explainRepetition : Regex.Repetition -> Regex.Atom -> List (Html a)
-explainRepetition { min, max } atom =
+explainRepetition repetition atom =
   let
+    (min, max) =
+      case repetition of
+        Regex.Optional -> (0, Just 1)
+        Regex.ZeroOrMore -> (0, Nothing)
+        Regex.OneOrMore -> (1, Nothing)
+        Regex.Exactly n -> (n, Just n)
+        Regex.Range range -> (Maybe.withDefault 0 range.min, range.max)
     prettyNumber n =
       case n of
         0 -> "zero"
@@ -156,6 +163,7 @@ explainRepetition { min, max } atom =
         , Html.text (prettyNumber min)
         , Html.text " and "
         , Html.text (prettyNumber m)
+        , Html.text (if m <= min then " (??)" else "")
         , Html.text " of:"
         , explanation
         ]

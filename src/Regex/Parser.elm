@@ -51,14 +51,14 @@ atomParser =
 
 type RepeatMax
   = This (Maybe Int)
-  | SameAsMin
+  | ExactlyMin
 
 maybeRepeat : Parser (Maybe Regex.Repetition)
 maybeRepeat =
   let
     parseNumberedRepeat =
       Parser.oneOf
-        [ Parser.succeed (\m -> { min = 0, max = Just m })
+        [ Parser.succeed (\m -> Regex.Range { min = Nothing, max = Just m })
             |. Parser.symbol ","
             |= Parser.int
         , Parser.succeed applyMax
@@ -74,19 +74,19 @@ maybeRepeat =
                     |= Parser.int
                 , Parser.succeed Nothing
                 ]
-        , Parser.succeed SameAsMin
+        , Parser.succeed ExactlyMin
         ]
     applyMax min repeatMax =
       case repeatMax of
-        This max -> { min = min, max = max }
-        SameAsMin -> { min = min, max = Just min }
+        This max -> Regex.Range { min = Just min, max = max }
+        ExactlyMin -> Regex.Exactly min
   in
   Parser.oneOf
-    [ Parser.succeed (Just { min = 0, max = Nothing })
+    [ Parser.succeed (Just Regex.ZeroOrMore)
         |. Parser.symbol "*"
-    , Parser.succeed (Just { min = 1, max = Nothing })
+    , Parser.succeed (Just Regex.OneOrMore)
         |. Parser.symbol "+"
-    , Parser.succeed (Just { min = 0, max = Just 1 })
+    , Parser.succeed (Just Regex.Optional)
         |. Parser.symbol "?"
     , Parser.succeed Just
         |. Parser.symbol "{"

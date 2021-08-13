@@ -15,7 +15,12 @@ type CharClassAtom
   = CCLiteral Char
   | CCRange Char Char
 
-type alias Repetition =
-  { min : Int
-  , max : Maybe Int
-  }
+type Repetition
+  = Optional
+  | ZeroOrMore
+  | OneOrMore
+  | Exactly Int
+  | Range
+      { min : Maybe Int
+      , max : Maybe Int
+      }
