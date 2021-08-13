@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import Debug
 import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events

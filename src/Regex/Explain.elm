@@ -1,6 +1,5 @@
 module Regex.Explain exposing (..)
 
-import Debug
 import Html exposing (Html)
 import Parser
 
