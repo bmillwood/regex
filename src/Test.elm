@@ -1,6 +1,8 @@
 module Test exposing (Model, Msg, init, view, update)
 
 import Html exposing (Html)
+import Html.Attributes as Attributes
+import Html.Events as Events
 import Parser exposing (Parser)
 import Random
 
@@ -8,21 +10,29 @@ import Regex exposing (Regex)
 import Regex.Gen
 import Regex.Parser
 
-type alias Model = { fuzzCases : List Regex }
-type Msg = SetCases (List Regex)
+type alias Model = { fuzzCases : List Regex, hidePassing : Bool }
+type Msg
+  = SetCases (List Regex)
+  | SetHidePassing Bool
 
 init : (Model, Cmd Msg)
 init =
-  ( { fuzzCases = [] }
+  ( { fuzzCases = [], hidePassing = True }
   , Random.generate SetCases
       (Random.list 10 (Regex.Gen.regex { size = 10 }))
   )
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update (SetCases cases) model =
-  ( { model | fuzzCases = cases }
-  , Cmd.none
-  )
+update msg model =
+  let
+    newModel =
+      case msg of
+        SetCases fuzzCases ->
+          { model | fuzzCases = fuzzCases }
+        SetHidePassing hidePassing ->
+          { model | hidePassing = hidePassing }
+  in
+  (newModel, Cmd.none)
 
 regressionTests : List Regex
 regressionTests =
@@ -51,7 +61,7 @@ toRowGen mkCell { pass, input, toString, parsed, reString } =
     ]
 
 view : Model -> Html Msg
-view { fuzzCases } =
+view { fuzzCases, hidePassing } =
   let
     header =
       toRowGen
@@ -63,25 +73,69 @@ view { fuzzCases } =
         , reString = Html.text "restring"
         }
 
-    toRow input = toRowGen (Html.td []) (testRegex input)
+    toRow input =
+      Maybe.map
+        (toRowGen (Html.td []))
+        (testRegex { hidePassing = hidePassing } input)
 
-    table cases =
-      Html.table
-        []
-        [ Html.thead [] [ header ]
-        , Html.tbody [] (List.map toRow cases)
-        ]
+    table title cases =
+      let
+        (rows, omitted) =
+          List.foldr
+            (\test (rowsAcc, omittedAcc) ->
+              case toRow test of
+                Nothing -> (rowsAcc, omittedAcc + 1)
+                Just row -> (row :: rowsAcc, omittedAcc)
+            )
+            ([], 0)
+            cases
+        footer =
+          if omitted > 0
+          then
+            [ Html.p []
+                [ Html.text (String.fromInt omitted)
+                , Html.text " test"
+                , Html.text (if omitted == 1 then "" else "s")
+                , Html.text " not shown because "
+                , Html.text (if omitted == 1 then "it" else "they")
+                , Html.text " passed"
+                ]
+            ]
+          else []
+      in
+      [ Html.h1 [] [ Html.text title ]
+      , Html.table
+          []
+          [ Html.thead [] [ header ]
+          , Html.tbody [] rows
+          ]
+      ] ++ footer
   in
   Html.div
     []
-    [ Html.h1 [] [ Html.text "Fuzz tests" ]
-    , table fuzzCases
-    , Html.h1 [] [ Html.text "Regression tests" ]
-    , table regressionTests
-    ]
+    (List.concat
+      [ [ Html.form
+            []
+            [ Html.label
+                [ Attributes.for "hidePassing"
+                ]
+                [ Html.input
+                    [ Attributes.type_ "checkbox"
+                    , Attributes.id "hidePassing"
+                    , Attributes.checked hidePassing
+                    , Events.onCheck SetHidePassing
+                    ]
+                    []
+                , Html.text "Hide passing test cases"
+                ]
+            ]
+        ]
+      , table "Fuzz tests" fuzzCases
+      , table "Regression tests" regressionTests
+      ])
 
-testRegex : Regex -> TestRow a
-testRegex regex =
+testRegex : { hidePassing : Bool } -> Regex -> Maybe (TestRow a)
+testRegex { hidePassing } regex =
   let
     input = Html.text (Debug.toString regex)
     toString = Regex.toString regex
@@ -94,14 +148,15 @@ testRegex regex =
           ( Html.text (Debug.toString newRegex)
           , Regex.toString newRegex
           )
-    pass =
-      if parseResult == Ok regex && toString == reString
-      then Html.text "yes"
-      else Html.text "no"
+    isPassing = parseResult == Ok regex && toString == reString
   in
-  { pass = pass
-  , input = input
-  , toString = Html.text toString
-  , parsed = parsed
-  , reString = Html.text reString
-  }
+  if isPassing && hidePassing
+  then Nothing
+  else
+    Just
+      { pass = Html.text (if isPassing then "yes" else "no")
+      , input = input
+      , toString = Html.text toString
+      , parsed = parsed
+      , reString = Html.text reString
+      }
