@@ -38,6 +38,10 @@ atomParser =
             |. Parser.symbol "("
             |= Parser.lazy (\ () -> parser)
             |. Parser.symbol ")"
+        , Parser.succeed Regex.StartOfInput
+            |. Parser.symbol "^"
+        , Parser.succeed Regex.EndOfInput
+            |. Parser.symbol "$"
         , backslashEscape
         , Parser.map Regex.Literal plainLiteral
         ]

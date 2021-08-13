@@ -10,6 +10,8 @@ empty = [[]]
 
 type Atom
   = Literal Char
+  | StartOfInput
+  | EndOfInput
   | CharacterClass { negated : Bool, atoms : List CharClassAtom }
   | Capture Regex
   | Repeat Repetition Atom
@@ -30,7 +32,7 @@ type Repetition
 
 reservedChars : Set Char
 reservedChars =
-  Set.fromList [ '|', '(', ')', '[', ']' ]
+  Set.fromList [ '|', '(', ')', '[', ']', '^', '$' ]
 
 backslashEscapes : Dict Char Atom
 backslashEscapes =
@@ -61,6 +63,8 @@ atomToString atom =
       if Set.member c reservedChars
       then String.fromList [ '\\', c ]
       else charToString c
+    StartOfInput -> "^"
+    EndOfInput -> "$"
     CharacterClass { negated, atoms } ->
       let
         ccAtomString ccatom =

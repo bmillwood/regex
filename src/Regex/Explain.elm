@@ -61,6 +61,8 @@ explainAtom atom =
       -- NB. despite squeezeAtoms, this case is reachable, because
       -- we only bother squeezing when we have a sequence
       [ Html.text ("the character " ++ Debug.toString c) ]
+    Regex.StartOfInput -> [ Html.text "the start of the string" ]
+    Regex.EndOfInput -> [ Html.text "the end of the string" ]
     Regex.CharacterClass cc -> explainCharacterClass cc
     Regex.Capture r -> explainDisjuncts r
     Regex.Repeat repetition unit ->
