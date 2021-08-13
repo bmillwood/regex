@@ -1,10 +1,8 @@
-module Main exposing (main)
+module Real exposing (Model, Msg, init, view, update)
 
-import Browser
 import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
-import Json.Decode
 import Parser
 
 import Regex exposing (Regex)
@@ -21,8 +19,8 @@ type Msg
   = SetInput String
   | SetRegex Regex
 
-init : Json.Decode.Value -> (Model, Cmd Msg)
-init flags =
+init : (Model, Cmd Msg)
+init =
   ( { unparsed = ""
     , lastParsed = Regex.empty
     , error = Nothing
@@ -71,14 +69,3 @@ update msg model =
         }
       , Cmd.none
       )
-
-subscriptions : Model -> Sub Msg
-subscriptions _ = Sub.none
-
-main =
-  Browser.element
-    { init          = init
-    , view          = view
-    , update        = update
-    , subscriptions = subscriptions
-    }
