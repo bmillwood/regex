@@ -9,16 +9,20 @@ empty : Regex
 empty = [[]]
 
 type Atom
-  = Literal Char
-  | StartOfInput
+  = StartOfInput
   | EndOfInput
-  | CharacterClass { negated : Bool, atoms : List CharClassAtom }
+  | CharMatching CharMatch
   | Capture Regex
   | Repeat Repetition Atom
 
-type CharClassAtom
-  = CCLiteral Char
-  | CCRange Char Char
+type CharMatch
+  = MatchLit Char
+  | MatchAny
+  | MatchClass { negated : Bool, matchAtoms : List ClassAtom }
+
+type ClassAtom
+  = ClassLit Char
+  | ClassRange Char Char
 
 type Repetition
   = Optional
@@ -32,13 +36,13 @@ type Repetition
 
 reservedChars : Set Char
 reservedChars =
-  Set.fromList [ '|', '(', ')', '[', ']', '^', '$' ]
+  Set.fromList [ '\\', '|', '(', ')', '[', ']', '^', '$', '.' ]
 
 backslashEscapes : Dict Char Atom
 backslashEscapes =
   Dict.fromList
-    [ ('n', Literal '\n')
-    , ('r', Literal '\r')
+    [ ('n', CharMatching (MatchLit '\n'))
+    , ('r', CharMatching (MatchLit '\r'))
     ]
 
 charToString : Char -> String
@@ -59,25 +63,9 @@ toString regex =
 atomToString : Atom -> String
 atomToString atom =
   case atom of
-    Literal c ->
-      if Set.member c reservedChars
-      then String.fromList [ '\\', c ]
-      else charToString c
     StartOfInput -> "^"
     EndOfInput -> "$"
-    CharacterClass { negated, atoms } ->
-      let
-        ccAtomString ccatom =
-          case ccatom of
-            CCLiteral c -> charToString c
-            CCRange c1 c2 -> charToString c1 ++ "-" ++ charToString c2
-      in
-      String.concat
-        [ "["
-        , if negated then "^" else ""
-        , String.concat (List.map ccAtomString atoms)
-        , "]"
-        ]
+    CharMatching match -> charMatchToString match
     Capture c -> "(" ++ toString c ++ ")"
     Repeat r a ->
       let
@@ -99,3 +87,26 @@ atomToString atom =
                 ]
       in
       atomToString a ++ repeatString
+
+charMatchToString : CharMatch -> String
+charMatchToString cm =
+  case cm of
+    MatchLit c ->
+      if Set.member c reservedChars
+      then String.fromList [ '\\', c ]
+      else charToString c
+    MatchAny -> "."
+    MatchClass { negated, matchAtoms } ->
+      let
+        ccAtomString ccatom =
+          case ccatom of
+            ClassLit c -> charToString c
+            ClassRange c1 c2 ->
+              charToString c1 ++ "-" ++ charToString c2
+      in
+      String.concat
+        [ "["
+        , if negated then "^" else ""
+        , String.concat (List.map ccAtomString matchAtoms)
+        , "]"
+        ]

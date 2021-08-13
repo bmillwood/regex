@@ -45,9 +45,9 @@ squeezeAtoms =
   let
     f atom acc =
       case (atom, acc) of
-        (Regex.Literal c, Literals s :: rest) ->
+        (Regex.CharMatching (Regex.MatchLit c), Literals s :: rest) ->
           Literals (String.cons c s) :: rest
-        (Regex.Literal c, others) ->
+        (Regex.CharMatching (Regex.MatchLit c), others) ->
           Literals (String.fromChar c) :: others
         (other, others) ->
           Other other :: others
@@ -57,19 +57,25 @@ squeezeAtoms =
 explainAtom : Regex.Atom -> List (Html a)
 explainAtom atom =
   case atom of
-    Regex.Literal c ->
-      -- NB. despite squeezeAtoms, this case is reachable, because
-      -- we only bother squeezing when we have a sequence
-      [ Html.text ("the character " ++ Debug.toString c) ]
     Regex.StartOfInput -> [ Html.text "the start of the string" ]
     Regex.EndOfInput -> [ Html.text "the end of the string" ]
-    Regex.CharacterClass cc -> explainCharacterClass cc
+    Regex.CharMatching cm -> explainCharMatch cm
     Regex.Capture r -> explainDisjuncts r
     Regex.Repeat repetition unit ->
       explainRepetition repetition unit
 
-explainCharacterClass : { negated : Bool, atoms : List Regex.CharClassAtom } -> List (Html a)
-explainCharacterClass { negated, atoms } =
+explainCharMatch : Regex.CharMatch -> List (Html a)
+explainCharMatch match =
+  case match of
+    Regex.MatchLit c ->
+      -- NB. despite squeezeAtoms, this case is reachable, because
+      -- we only bother squeezing when we have a sequence
+      [ Html.text ("the character " ++ Debug.toString c) ]
+    Regex.MatchAny -> [ Html.text "any character" ]
+    Regex.MatchClass class -> explainMatchClass class
+
+explainMatchClass : { negated : Bool, matchAtoms : List Regex.ClassAtom } -> List (Html a)
+explainMatchClass { negated, matchAtoms } =
   let
     orText beforeEach beforeLast bits =
       case bits of
@@ -80,7 +86,7 @@ explainCharacterClass { negated, atoms } =
         bit :: others ->
           bit :: beforeEach :: orText beforeEach beforeLast others
     explained =
-      case partitionCCAtoms atoms of
+      case partitionCCAtoms matchAtoms of
         (lits, ranges) ->
           List.concat
             [ List.map Html.text
@@ -112,13 +118,13 @@ explainCharacterClass { negated, atoms } =
   ] ++ explained
 
 partitionCCAtoms
-  : List Regex.CharClassAtom -> (List Char, List (Char, Char))
+  : List Regex.ClassAtom -> (List Char, List (Char, Char))
 partitionCCAtoms =
   let
     f ccatom (lits, ranges) =
       case ccatom of
-        Regex.CCLiteral c -> (c :: lits, ranges)
-        Regex.CCRange c1 c2 -> (lits, (c1, c2) :: ranges)
+        Regex.ClassLit c -> (c :: lits, ranges)
+        Regex.ClassRange c1 c2 -> (lits, (c1, c2) :: ranges)
   in
   List.foldr f ([], [])
 

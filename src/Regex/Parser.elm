@@ -33,17 +33,16 @@ atomParser =
   let
     withoutRepetition =
       Parser.oneOf
-        [ Parser.map Regex.CharacterClass characterClass
+        [ Parser.succeed Regex.StartOfInput
+            |. Parser.symbol "^"
+        , Parser.succeed Regex.EndOfInput
+            |. Parser.symbol "$"
+        , Parser.map Regex.CharMatching charMatch
         , Parser.succeed Regex.Capture
             |. Parser.symbol "("
             |= Parser.lazy (\ () -> parser)
             |. Parser.symbol ")"
-        , Parser.succeed Regex.StartOfInput
-            |. Parser.symbol "^"
-        , Parser.succeed Regex.EndOfInput
-            |. Parser.symbol "$"
         , backslashEscape
-        , Parser.map Regex.Literal plainLiteral
         ]
     applyRepeat atom maybeRep =
       case maybeRep of
@@ -100,14 +99,23 @@ maybeRepeat =
     , Parser.succeed Nothing
     ]
 
-characterClass : Parser { negated : Bool, atoms : List Regex.CharClassAtom }
-characterClass =
+charMatch : Parser Regex.CharMatch
+charMatch =
+  Parser.oneOf
+    [ Parser.map Regex.MatchClass matchClass
+    , Parser.succeed Regex.MatchAny
+        |. Parser.symbol "."
+    , Parser.map Regex.MatchLit plainLiteral
+    ]
+
+matchClass : Parser { negated : Bool, matchAtoms : List Regex.ClassAtom }
+matchClass =
   let
     item =
       Parser.succeed (\c1 mc2 ->
         case mc2 of
-          Nothing -> Regex.CCLiteral c1
-          Just c2 -> Regex.CCRange c1 c2)
+          Nothing -> Regex.ClassLit c1
+          Just c2 -> Regex.ClassRange c1 c2)
         |= oneChar (\c -> c /= ']')
         |= Parser.oneOf
             [ Parser.succeed Just
@@ -126,8 +134,8 @@ characterClass =
     }
   |> Parser.map (\atoms ->
       case atoms of
-        (Regex.CCLiteral '^' :: ((_ :: _) as rest)) -> { negated = True, atoms = rest }
-        _ -> { negated = False, atoms = atoms }
+        (Regex.ClassLit '^' :: ((_ :: _) as rest)) -> { negated = True, matchAtoms = rest }
+        _ -> { negated = False, matchAtoms = atoms }
     )
 
 oneChar : (Char -> Bool) -> Parser Char
@@ -148,7 +156,9 @@ backslashEscape =
     |. Parser.symbol "\\"
     |= oneChar (\_ -> True)
   |> Parser.andThen (\c ->
-        case Dict.get c Regex.backslashEscapes of
+        if Set.member c Regex.reservedChars
+        then Parser.succeed (Regex.CharMatching (Regex.MatchLit c))
+        else case Dict.get c Regex.backslashEscapes of
           Just a -> Parser.succeed a
           Nothing -> Parser.problem "unrecognized backslash escape"
       )
