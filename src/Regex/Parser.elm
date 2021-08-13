@@ -1,5 +1,6 @@
 module Regex.Parser exposing (..)
 
+import Dict exposing (Dict)
 import Parser exposing (Parser, (|.), (|=))
 import Set exposing (Set)
 
@@ -134,22 +135,16 @@ oneChar p =
           Nothing -> Parser.problem "no input"
           Just (c, _) -> Parser.succeed c)
 
-reservedChars : Set Char
-reservedChars =
-  Set.fromList [ '|', '(', ')', '[', ']' ]
-
 plainLiteral : Parser Char
-plainLiteral = oneChar (\c -> not (Set.member c reservedChars))
+plainLiteral = oneChar (\c -> not (Set.member c Regex.reservedChars))
 
 backslashEscape : Parser Regex.Atom
 backslashEscape =
-  let
-    interpret c =
-      case c of
-        'n' -> Regex.Literal '\n'
-        'r' -> Regex.Literal '\r'
-        _ -> Regex.Literal c
-  in
-  Parser.succeed interpret
+  Parser.succeed identity
     |. Parser.symbol "\\"
     |= oneChar (\_ -> True)
+  |> Parser.andThen (\c ->
+        case Dict.get c Regex.backslashEscapes of
+          Just a -> Parser.succeed a
+          Nothing -> Parser.problem "unrecognized backslash escape"
+      )

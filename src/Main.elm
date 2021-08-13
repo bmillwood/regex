@@ -18,7 +18,8 @@ type alias Model =
   }
 
 type Msg
-  = Input String
+  = SetInput String
+  | SetRegex Regex
 
 init : Model
 init =
@@ -37,7 +38,7 @@ view model =
     inputAttributes =
       [ Attributes.type_ "text"
       , Attributes.value model.unparsed
-      , Events.onInput Input
+      , Events.onInput SetInput
       ] ++ maybeStyle
   in
   Html.div []
@@ -46,14 +47,21 @@ view model =
     ]
 
 update : Msg -> Model -> Model
-update (Input input) model =
-  case Parser.run Regex.Parser.parser input of
-    Ok newRegex ->
-      { unparsed = input, lastParsed = newRegex, error = Nothing }
-    Err error ->
-      { unparsed = input
-      , lastParsed = model.lastParsed
-      , error = Just error
+update msg model =
+  case msg of
+    SetInput input ->
+      case Parser.run Regex.Parser.parser input of
+        Ok newRegex ->
+          { unparsed = input, lastParsed = newRegex, error = Nothing }
+        Err error ->
+          { unparsed = input
+          , lastParsed = model.lastParsed
+          , error = Just error
+          }
+    SetRegex regex ->
+      { unparsed = Regex.toString regex
+      , lastParsed = regex
+      , error = Nothing
       }
 
 main =
