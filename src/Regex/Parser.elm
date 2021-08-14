@@ -115,16 +115,23 @@ charMatch =
 matchClass : Parser { negated : Bool, matchAtoms : List Regex.ClassAtom }
 matchClass =
   let
+    char =
+      Parser.oneOf
+        [ Parser.succeed identity
+            |. Parser.symbol "\\"
+            |= oneChar (\_ -> True)
+        , oneChar (\c -> c /= ']')
+        ]
     item =
       Parser.succeed (\c1 mc2 ->
         case mc2 of
           Nothing -> Regex.ClassLit c1
           Just c2 -> Regex.ClassRange c1 c2)
-        |= oneChar (\c -> c /= ']')
+        |= char
         |= Parser.oneOf
             [ Parser.succeed Just
                 |. Parser.symbol "-"
-                |= oneChar (\_ -> True)
+                |= char
             , Parser.succeed Nothing
             ]
   in

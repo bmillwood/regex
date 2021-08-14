@@ -58,6 +58,12 @@ charToString c =
     '\r' -> "\\r"
     other -> String.fromChar other
 
+escapeIf : Bool -> Char -> String
+escapeIf b c =
+  if b
+  then String.fromList ['\\', c]
+  else charToString c
+
 toString : Regex -> String
 toString regex =
   case regex of
@@ -94,21 +100,31 @@ pieceToString piece =
       in
       pieceToString a ++ repeatString
 
+mcEscapeworthy : Set Char
+mcEscapeworthy =
+  Set.fromList
+    [ '\\'
+    , ']', '-'
+    ]
+
 charMatchToString : CharMatch -> String
 charMatchToString cm =
   case cm of
     MatchLit c ->
-      if Set.member c reservedChars
-      then String.fromList [ '\\', c ]
-      else charToString c
+      escapeIf (Set.member c reservedChars) c
     MatchAny -> "."
     MatchClass { negated, matchAtoms } ->
       let
+        needEscape c = Set.member c mcEscapeworthy
         ccAtomString ccatom =
           case ccatom of
-            ClassLit c -> charToString c
+            ClassLit c -> escapeIf (needEscape c) c
             ClassRange c1 c2 ->
-              charToString c1 ++ "-" ++ charToString c2
+              String.concat
+                [ escapeIf (needEscape c1) c1
+                , "-"
+                , escapeIf (needEscape c2) c2
+                ]
       in
       String.concat
         [ "["
