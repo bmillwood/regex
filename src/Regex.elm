@@ -36,7 +36,13 @@ type Repetition
 
 reservedChars : Set Char
 reservedChars =
-  Set.fromList [ '\\', '|', '(', ')', '[', ']', '^', '$', '.' ]
+  Set.fromList
+    [ '\\'
+    , '|'
+    , '(', ')', '[', ']', '{', '}'
+    , '^', '$', '.'
+    , '?', '+', '*'
+    ]
 
 backslashEscapes : Dict Char Piece
 backslashEscapes =
