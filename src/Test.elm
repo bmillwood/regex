@@ -39,11 +39,14 @@ regressionTests =
   let
     lit c = Regex.CharMatching (Regex.MatchLit c)
     zeroOrMore piece = Regex.Repeat piece Regex.ZeroOrMore
+    classOfChars cs =
+      Regex.CharMatching
+        (Regex.MatchClass { negated = False, matchAtoms = (List.map Regex.ClassLit cs) })
   in
   [ [[ zeroOrMore (zeroOrMore (Regex.Capture Regex.empty)) ]]
   , [[ lit '.', lit '?', lit '*', lit '+', lit '{', lit '}' ]]
   , [[ Regex.Repeat (Regex.Capture Regex.empty) (Regex.Range { min = Nothing, max = Nothing }) ]]
-  , [[ Regex.CharMatching (Regex.MatchClass { negated = False, matchAtoms = [Regex.ClassLit ']'] }) ]]
+  , [[ classOfChars ['\\', '-', ']'] ]]
   ]
 
 type alias TestRow a =
