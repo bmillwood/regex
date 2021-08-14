@@ -43,7 +43,7 @@ view model =
   in
   Html.div []
     [ Html.p [] [ Html.input inputAttributes [] ]
-    , Html.p [] [ Regex.Explain.explainRegex model.lastParsed ]
+    , Html.p [] [ Html.map SetRegex (Regex.Explain.explainRegex model.lastParsed) ]
     ]
 
 update : Msg -> Model -> (Model, Cmd Msg)

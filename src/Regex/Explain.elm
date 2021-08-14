@@ -1,38 +1,62 @@
 module Regex.Explain exposing (..)
 
 import Html exposing (Html)
+import Html.Attributes as Attributes
+import Html.Events as Events
 import Parser
 
 import Regex exposing (Regex)
+import Zipper
 
-explainRegex : Regex -> Html a
+explainRegex : Regex -> Html Regex
 explainRegex regex = Html.p [] (explainDisjuncts regex)
 
-explainDisjuncts : Regex -> List (Html a)
+list : (a -> Html a) -> List a -> List (Html (List a))
+list f xs =
+  List.map
+    (\(b, x, a) -> Html.map (\y -> Zipper.toList (b, y, a)) (f x))
+    (Zipper.ofList xs)
+
+single : (a -> List (Html a)) -> a -> List (Html (List a))
+single f x = List.map (Html.map (\y -> [ y ])) (f x)
+
+explainDisjuncts : Regex -> List (Html Regex)
 explainDisjuncts ds =
   case ds of
     [] -> [ Html.text "empty regex (matches nothing)" ]
-    [ d ] -> explainDisjunct d
+    [ d ] -> single explainDisjunct d
     _ ->
       [ Html.text "any of:"
-      , Html.ul [] (List.map (Html.li [] << explainDisjunct) ds)
+      , Html.ul [] (list (Html.li [] << explainDisjunct) ds)
       ]
 
-explainDisjunct : List Regex.Piece -> List (Html a)
+explainDisjunct : List Regex.Piece -> List (Html (List Regex.Piece))
 explainDisjunct pieces =
   let
+    explainSqueezed : Squeezed -> List (Html Squeezed)
     explainSqueezed squeezed =
       case squeezed of
         Literals s ->
-          [ Html.text ("the string " ++ Debug.toString s) ]
-        Other piece -> explainPiece piece
+          [ Html.text "the string "
+          , Html.input
+              [ Attributes.type_ "text"
+              , Attributes.value s
+              , Events.onInput Literals
+              , Attributes.style "width" (String.fromInt (String.length s) ++ "em")
+              ]
+              []
+          ]
+        Other piece -> List.map (Html.map Other) (explainPiece piece)
+    unsqueezes = List.map (Html.map (List.concatMap unsqueeze))
   in
   case squeeze pieces of
     [] -> [ Html.text "the empty string" ]
-    [ squeezed ] -> explainSqueezed squeezed
+    [ squeezed ] -> unsqueezes (single explainSqueezed squeezed)
     squeezeds ->
       [ Html.text "a sequence of:"
-      , Html.ul [] (List.map (Html.li [] << explainSqueezed) squeezeds)
+      , Html.ul
+          []
+          (unsqueezes (list (Html.li [] << explainSqueezed) squeezeds))
       ]
 
 type Squeezed
@@ -53,13 +77,22 @@ squeeze =
   in
   List.foldr f []
 
-explainPiece : Regex.Piece -> List (Html a)
+unsqueeze : Squeezed -> List Regex.Piece
+unsqueeze sq =
+  case sq of
+    Literals s ->
+      List.map
+        (\c -> Regex.CharMatching (Regex.MatchLit c))
+        (String.toList s)
+    Other p -> [ p ]
+
+explainPiece : Regex.Piece -> List (Html Regex.Piece)
 explainPiece piece =
   case piece of
     Regex.StartOfInput -> [ Html.text "the start of the string" ]
     Regex.EndOfInput -> [ Html.text "the end of the string" ]
     Regex.CharMatching cm -> explainCharMatch cm
-    Regex.Capture r -> explainDisjuncts r
+    Regex.Capture r -> List.map (Html.map Regex.Capture) (explainDisjuncts r)
     Regex.Repeat repetition unit ->
       explainRepetition repetition unit
 
@@ -127,7 +160,7 @@ partitionClassAtoms =
   in
   List.foldr f ([], [])
 
-explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html a)
+explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
 explainRepetition piece repetition =
   let
     (min, max) =
@@ -142,7 +175,9 @@ explainRepetition piece repetition =
         0 -> "zero"
         1 -> "one"
         _ -> String.fromInt n
-    explanation = Html.ul [] [ Html.li [] (explainPiece piece) ]
+    explanation =
+      Html.ul [] [ Html.li [] (explainPiece piece) ]
+      |> Html.map (\p -> Regex.Repeat p repetition)
   in
   case max of
     Nothing ->
