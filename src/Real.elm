@@ -19,14 +19,16 @@ type Msg
   = SetInput String
   | SetRegex Regex
 
-init : (Model, Cmd Msg)
-init =
-  ( { unparsed = ""
-    , lastParsed = Regex.empty
-    , error = Nothing
-    }
-  , Cmd.none
-  )
+init : { initialInput : String } -> (Model, Cmd Msg)
+init { initialInput } =
+  let
+    emptyModel =
+      { unparsed = ""
+      , lastParsed = Regex.empty
+      , error = Nothing
+      }
+  in
+  update (SetInput initialInput) emptyModel
 
 view : Model -> Html Msg
 view model =
