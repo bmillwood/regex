@@ -71,9 +71,9 @@ repeats =
         ]
     parseNumberedRepeat =
       Parser.oneOf
-        [ Parser.succeed (\m -> Regex.Range { min = Nothing, max = Just m })
+        [ Parser.succeed (\m -> Regex.Range { min = Nothing, max = m })
             |. Parser.symbol ","
-            |= Parser.int
+            |= Parser.oneOf [ Parser.map Just Parser.int, Parser.succeed Nothing ]
         , Parser.succeed applyMax
             |= Parser.int
             |= getMax
