@@ -104,7 +104,7 @@ mcEscapeworthy : Set Char
 mcEscapeworthy =
   Set.fromList
     [ '\\'
-    , ']', '-'
+    , '^', ']', '-'
     ]
 
 charMatchToString : CharMatch -> String

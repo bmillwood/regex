@@ -47,6 +47,7 @@ regressionTests =
   , [[ lit '.', lit '?', lit '*', lit '+', lit '{', lit '}' ]]
   , [[ Regex.Repeat (Regex.Capture Regex.empty) (Regex.Range { min = Nothing, max = Nothing }) ]]
   , [[ classOfChars ['\\', '-', ']'] ]]
+  , [[ classOfChars ['^', 'x'] ]]
   ]
 
 type alias TestRow a =

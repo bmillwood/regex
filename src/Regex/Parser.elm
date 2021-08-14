@@ -134,20 +134,24 @@ matchClass =
                 |= char
             , Parser.succeed Nothing
             ]
+    items =
+      Parser.sequence
+        { start = ""
+        , separator = ""
+        , end = "]"
+        , spaces = Parser.succeed ()
+        , item = item
+        , trailing = Parser.Forbidden
+        }
   in
-  Parser.sequence
-    { start = "["
-    , separator = ""
-    , end = "]"
-    , spaces = Parser.succeed ()
-    , item = item
-    , trailing = Parser.Forbidden
-    }
-  |> Parser.map (\atoms ->
-      case atoms of
-        (Regex.ClassLit '^' :: ((_ :: _) as rest)) -> { negated = True, matchAtoms = rest }
-        _ -> { negated = False, matchAtoms = atoms }
-    )
+  Parser.succeed (\negated atoms -> { negated = negated, matchAtoms = atoms })
+    |. Parser.symbol "["
+    |= Parser.oneOf
+        [ Parser.succeed True
+            |. Parser.symbol "^"
+        , Parser.succeed False
+        ]
+    |= items
 
 oneChar : (Char -> Bool) -> Parser Char
 oneChar p =
