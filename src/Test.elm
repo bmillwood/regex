@@ -19,7 +19,7 @@ init : (Model, Cmd Msg)
 init =
   ( { fuzzCases = [], hidePassing = True }
   , Random.generate SetCases
-      (Random.list 10 (Regex.Gen.regex { size = 10 }))
+      (Random.list 100 (Regex.Gen.regex { size = 10 }))
   )
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -43,6 +43,7 @@ regressionTests =
   [ [[ zeroOrMore (zeroOrMore (Regex.Capture Regex.empty)) ]]
   , [[ lit '.', lit '?', lit '*', lit '+', lit '{', lit '}' ]]
   , [[ Regex.Repeat (Regex.Capture Regex.empty) (Regex.Range { min = Nothing, max = Nothing }) ]]
+  , [[ Regex.CharMatching (Regex.MatchClass { negated = False, matchAtoms = [Regex.ClassLit ']'] }) ]]
   ]
 
 type alias TestRow a =
