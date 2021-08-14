@@ -36,8 +36,12 @@ update msg model =
 
 regressionTests : List Regex
 regressionTests =
-  [ [[ Regex.Repeat (Regex.Repeat (Regex.Capture Regex.empty) Regex.ZeroOrMore) Regex.ZeroOrMore ]]
-  , [[ Regex.CharMatching Regex.MatchAny, Regex.CharMatching (Regex.MatchLit '?') ]]
+  let
+    lit c = Regex.CharMatching (Regex.MatchLit c)
+    zeroOrMore piece = Regex.Repeat piece Regex.ZeroOrMore
+  in
+  [ [[ zeroOrMore (zeroOrMore (Regex.Capture Regex.empty)) ]]
+  , [[ lit '.', lit '?', lit '*', lit '+', lit '{', lit '}' ]]
   , [[ Regex.Repeat (Regex.Capture Regex.empty) (Regex.Range { min = Nothing, max = Nothing }) ]]
   ]
 
