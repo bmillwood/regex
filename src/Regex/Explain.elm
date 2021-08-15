@@ -193,12 +193,16 @@ repetitionOfKind { min, max } kind =
 explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
 explainRepetition piece repetition =
   let
+    toIntOrZero s =
+      if s == ""
+      then Just 0
+      else String.toInt s
     numberField n toRep =
       Html.input
         [ Attributes.type_ "text"
         , Attributes.value (String.fromInt n)
         , Events.onInput (\s ->
-              updateRepetition (toRep (Maybe.withDefault n (String.toInt s)))
+              updateRepetition (toRep (Maybe.withDefault n (toIntOrZero s)))
             )
         , Attributes.style "width" "3em"
         ]
