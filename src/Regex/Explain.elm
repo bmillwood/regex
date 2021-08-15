@@ -180,15 +180,15 @@ repetitionKind rep =
         Nothing -> AtLeast
         Just _ -> Range
 
-repetitionOfKind : { min : Maybe Int, max : Maybe Int } -> RepetitionKind -> Regex.Repetition
+repetitionOfKind : { min : Int, max : Int } -> RepetitionKind -> Regex.Repetition
 repetitionOfKind { min, max } kind =
   case kind of
     Optional -> Regex.Optional
     ZeroOrMore -> Regex.ZeroOrMore
     OneOrMore -> Regex.OneOrMore
-    Exactly -> Regex.Exactly (Maybe.withDefault (Maybe.withDefault 0 min) max)
-    AtLeast -> Regex.Range { min = min, max = Nothing }
-    Range -> Regex.Range { min = min, max = max }
+    Exactly -> Regex.Exactly min
+    AtLeast -> Regex.Range { min = Just min, max = Nothing }
+    Range -> Regex.Range { min = Just min, max = Just max }
 
 explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
 explainRepetition piece repetition =
@@ -229,7 +229,22 @@ explainRepetition piece repetition =
         [ (k, _) ] -> k
         _ -> Optional
     repetitionOf kind =
-      repetitionOfKind { min = Just 0, max = Just 0 } kind
+      let
+        bounds =
+          case repetition of
+            Regex.Optional -> { min = 0, max = 1 }
+            Regex.ZeroOrMore -> { min = 0, max = 0 }
+            Regex.OneOrMore -> { min = 1, max = 1 }
+            Regex.Exactly n -> { min = n, max = n }
+            Regex.Range { min, max } ->
+              let
+                newMin = Maybe.withDefault 0 min
+              in
+              { min = newMin
+              , max = Maybe.withDefault newMin max
+              }
+      in
+      repetitionOfKind bounds kind
     updateRepetition rep = Regex.Repeat piece rep
     optionOf kind =
       Html.option
