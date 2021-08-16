@@ -46,6 +46,13 @@ view model =
   Html.div []
     [ Html.p [] [ Html.input inputAttributes [] ]
     , Html.p [] [ Html.map SetRegex (Regex.Explain.explainRegex model.lastParsed) ]
+    , Html.p
+        []
+        [ Html.hr [] []
+        , Html.a
+            [ Attributes.href "https://github.com/bmillwood/regex" ]
+            [ Html.text "Source" ]
+        ]
     ]
 
 update : Msg -> Model -> (Model, Cmd Msg)
