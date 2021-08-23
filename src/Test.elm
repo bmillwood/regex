@@ -9,6 +9,7 @@ import Random
 import Regex exposing (Regex)
 import Regex.Gen
 import Regex.Parser
+import Regex.Unparser
 
 type alias Model = { fuzzCases : List Regex, hidePassing : Bool }
 type Msg
@@ -147,7 +148,7 @@ testRegex : { hidePassing : Bool } -> Regex -> Maybe (TestRow a)
 testRegex { hidePassing } regex =
   let
     input = Html.text (Debug.toString regex)
-    toString = Regex.toString regex
+    toString = Regex.Unparser.toString regex
     parseResult = Parser.run Regex.Parser.parser toString
     (parsed, reString) =
       case parseResult of
@@ -155,7 +156,7 @@ testRegex { hidePassing } regex =
           ( Html.text "#ERR", "#ERR" )
         Ok newRegex ->
           ( Html.text (Debug.toString newRegex)
-          , Regex.toString newRegex
+          , Regex.Unparser.toString newRegex
           )
     isPassing = parseResult == Ok regex && toString == reString
   in

@@ -8,6 +8,7 @@ import Parser
 import Regex exposing (Regex)
 import Regex.Explain
 import Regex.Parser
+import Regex.Unparser
 
 type alias Model =
   { unparsed : String
@@ -72,7 +73,7 @@ update msg model =
           , Cmd.none
           )
     SetRegex regex ->
-      ( { unparsed = Regex.toString regex
+      ( { unparsed = Regex.Unparser.toString regex
         , lastParsed = regex
         , error = Nothing
         }
