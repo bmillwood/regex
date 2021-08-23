@@ -125,8 +125,9 @@ classAtomSelect =
         []
     guessChar ca =
       case ca of
-        Regex.ClassLit c -> c
-        Regex.ClassRange c1 _ -> c1
+        Nothing -> 'a'
+        Just (Regex.ClassLit c) -> c
+        Just (Regex.ClassRange c1 _) -> c1
   in
   [ Variant.Html.ofVariant
       "equal to"
@@ -199,13 +200,14 @@ repetitionSelect =
         , Attributes.style "width" "3em"
         ]
         []
-    guessBounds rep =
-      case rep of
-        Regex.Optional -> { min = 0, max = 1 }
-        Regex.ZeroOrMore -> { min = 0, max = 1 }
-        Regex.OneOrMore -> { min = 1, max = 1 }
-        Regex.Exactly n -> { min = n, max = n }
-        Regex.Range { min, max } ->
+    guessBounds maybeRep =
+      case maybeRep of
+        Nothing -> { min = 0, max = 1 }
+        Just Regex.Optional -> { min = 0, max = 1 }
+        Just Regex.ZeroOrMore -> { min = 0, max = 1 }
+        Just Regex.OneOrMore -> { min = 1, max = 1 }
+        Just (Regex.Exactly n) -> { min = n, max = n }
+        Just (Regex.Range { min, max }) ->
           let
             newMin = Maybe.withDefault 0 min
           in
