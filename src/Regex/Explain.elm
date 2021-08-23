@@ -6,6 +6,7 @@ import Html.Events as Events
 import Parser
 
 import Regex exposing (Regex)
+import Variant
 import Variant.Html
 import Zipper
 
@@ -92,12 +93,12 @@ explainPiece piece =
   case piece of
     Regex.StartOfInput -> [ Html.text "the start of the string" ]
     Regex.EndOfInput -> [ Html.text "the end of the string" ]
-    Regex.CharMatching cm -> explainCharMatch cm
+    Regex.CharMatching cm -> List.map (Html.map Regex.CharMatching) (explainCharMatch cm)
     Regex.Capture r -> List.map (Html.map Regex.Capture) (explainDisjuncts r)
     Regex.Repeat unit repetition ->
       explainRepetition unit repetition
 
-explainCharMatch : Regex.CharMatch -> List (Html a)
+explainCharMatch : Regex.CharMatch -> List (Html Regex.CharMatch)
 explainCharMatch match =
   case match of
     Regex.MatchLit c ->
@@ -107,48 +108,70 @@ explainCharMatch match =
     Regex.MatchAny -> [ Html.text "any character" ]
     Regex.MatchClass class -> explainMatchClass class
 
-explainMatchClass : { negated : Bool, matchAtoms : List Regex.ClassAtom } -> List (Html a)
-explainMatchClass { negated, matchAtoms } =
+classAtomSelect : Variant.Html.Select Regex.ClassAtom
+classAtomSelect =
   let
-    orText beforeEach beforeLast bits =
-      case bits of
-        [] -> []
-        [ bit ] -> [ bit ]
-        [ bit1, bit2 ] ->
-          [ bit1, beforeEach, beforeLast, bit2 ]
-        bit :: others ->
-          bit :: beforeEach :: orText beforeEach beforeLast others
-    explained =
-      case partitionClassAtoms matchAtoms of
-        (lits, ranges) ->
-          List.concat
-            [ List.map Html.text
-                (orText ", " "or " (List.map Debug.toString lits))
-            , if not (List.isEmpty lits || List.isEmpty ranges)
-                then [ Html.text ", or " ]
-                else []
-            , explainRanges ranges
-            ]
-    explainRanges ranges =
-      case ranges of
-        [] -> []
-        [ range ] ->
-          (Html.text "in the range " :: explainRange range)
-        _ ->
-          List.concat (
-              [ Html.text "in any of the ranges " ]
-              :: orText [ Html.text ", " ] []
-                  (List.map explainRange ranges)
+    charField c =
+      Html.input
+        [ Attributes.type_ "text"
+        , Attributes.value (String.fromChar c)
+        , Events.onInput (\s ->
+              case String.uncons (String.filter (\sc -> c /= sc) s) of
+                Nothing -> c
+                Just (newC, _) -> newC
             )
-    explainRange (start, end) =
-      [ Html.text (String.fromChar start)
-      , Html.text "-"
-      , Html.text (String.fromChar end)
-      ]
+        , Attributes.style "width" "1em"
+        ]
+        []
+    guessChar ca =
+      case ca of
+        Regex.ClassLit c -> c
+        Regex.ClassRange c1 _ -> c1
   in
-  [ Html.text "a character "
-  , Html.text (if negated then "not " else "")
-  ] ++ explained
+  [ Variant.Html.ofVariant
+      "equal to"
+      Regex.classLit
+      guessChar
+      (\c ->
+        [ Html.text " "
+        , charField c
+        ]
+      )
+  , Variant.Html.ofVariant
+      "in the range"
+      Regex.classRange
+      (\ca -> let c = guessChar ca in (c, c))
+      (\(c1, c2) ->
+        [ Html.text " "
+        , charField c1
+          |> Html.map (\new1 -> (new1, c2))
+        , Html.text " to "
+        , charField c2
+          |> Html.map (\new2 -> (c1, new2))
+        ]
+      )
+  ]
+
+explainMatchClass : { negated : Bool, matchAtoms : List Regex.ClassAtom } -> List (Html Regex.CharMatch)
+explainMatchClass ({ negated, matchAtoms } as matchClass) =
+  let
+    ofAtom ca = Html.li [] (Variant.Html.toHtml classAtomSelect ca)
+    setNegated newNegated = Regex.MatchClass { matchClass | negated = newNegated }
+    setAtoms newAtoms = Regex.MatchClass { matchClass | matchAtoms = newAtoms }
+  in
+  List.concat
+  [ [ Html.text "a character that is " ]
+  , Variant.Html.toHtml
+      [ Variant.Html.ofUnit "any" (Variant.unit False)
+      , Variant.Html.ofUnit "none" (Variant.unit True)
+      ]
+      negated
+    |> List.map (Html.map setNegated)
+  , [ Html.text " of:"
+    , Html.ul [] (list ofAtom matchAtoms)
+      |> Html.map setAtoms
+    ]
+  ]
 
 partitionClassAtoms
   : List Regex.ClassAtom -> (List Char, List (Char, Char))

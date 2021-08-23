@@ -26,6 +26,24 @@ type ClassAtom
   = ClassLit Char
   | ClassRange Char Char
 
+classLit : Variant ClassAtom Char
+classLit =
+  { match = \r ->
+      case r of
+        ClassLit c -> Just c
+        _ -> Nothing
+  , make = ClassLit
+  }
+
+classRange : Variant ClassAtom (Char, Char)
+classRange =
+  { match = \r ->
+      case r of
+        ClassRange c1 c2 -> Just (c1, c2)
+        _ -> Nothing
+  , make = \(c1, c2) -> ClassRange c1 c2
+  }
+
 type Repetition
   = Optional
   | ZeroOrMore
@@ -35,23 +53,6 @@ type Repetition
       { min : Maybe Int
       , max : Maybe Int
       }
-
-reservedChars : Set Char
-reservedChars =
-  Set.fromList
-    [ '\\'
-    , '|'
-    , '(', ')', '[', ']', '{', '}'
-    , '^', '$', '.'
-    , '?', '+', '*'
-    ]
-
-backslashEscapes : Dict Char Piece
-backslashEscapes =
-  Dict.fromList
-    [ ('n', CharMatching (MatchLit '\n'))
-    , ('r', CharMatching (MatchLit '\r'))
-    ]
 
 optional : Variant Repetition ()
 optional = Variant.unit Optional
@@ -101,3 +102,22 @@ between =
           Just m -> Just (min, m)
     , make = \(min, max) -> { min = min, max = Just max }
     }
+
+--
+
+reservedChars : Set Char
+reservedChars =
+  Set.fromList
+    [ '\\'
+    , '|'
+    , '(', ')', '[', ']', '{', '}'
+    , '^', '$', '.'
+    , '?', '+', '*'
+    ]
+
+backslashEscapes : Dict Char Piece
+backslashEscapes =
+  Dict.fromList
+    [ ('n', CharMatching (MatchLit '\n'))
+    , ('r', CharMatching (MatchLit '\r'))
+    ]
