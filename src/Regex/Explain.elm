@@ -6,6 +6,7 @@ import Html.Events as Events
 import Parser
 
 import Regex exposing (Regex)
+import Variant.Html
 import Zipper
 
 explainRegex : Regex -> Html Regex
@@ -160,146 +161,79 @@ partitionClassAtoms =
   in
   List.foldr f ([], [])
 
-type RepetitionKind
-  = Optional
-  | ZeroOrMore
-  | OneOrMore
-  | Exactly
-  | AtLeast
-  | Range
-
-repetitionKind : Regex.Repetition -> RepetitionKind
-repetitionKind rep =
-  case rep of
-    Regex.Optional -> Optional
-    Regex.ZeroOrMore -> ZeroOrMore
-    Regex.OneOrMore -> OneOrMore
-    Regex.Exactly _ -> Exactly
-    Regex.Range { min, max } ->
-      case max of
-        Nothing -> AtLeast
-        Just _ -> Range
-
-repetitionOfKind : { min : Int, max : Int } -> RepetitionKind -> Regex.Repetition
-repetitionOfKind { min, max } kind =
-  case kind of
-    Optional -> Regex.Optional
-    ZeroOrMore -> Regex.ZeroOrMore
-    OneOrMore -> Regex.OneOrMore
-    Exactly -> Regex.Exactly min
-    AtLeast -> Regex.Range { min = Just min, max = Nothing }
-    Range -> Regex.Range { min = Just min, max = Just max }
-
-explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
-explainRepetition piece repetition =
+repetitionSelect : Variant.Html.Select Regex.Repetition
+repetitionSelect =
   let
     toIntOrZero s =
       if s == ""
       then Just 0
       else String.toInt s
-    numberField n toRep =
+    numberField n =
       Html.input
         [ Attributes.type_ "text"
         , Attributes.value (String.fromInt n)
-        , Events.onInput (\s ->
-              updateRepetition (toRep (Maybe.withDefault n (toIntOrZero s)))
-            )
+        , Events.onInput (\s -> Maybe.withDefault n (toIntOrZero s))
         , Attributes.style "width" "3em"
         ]
         []
-    prettyNumber n =
-      case n of
-        0 -> "zero"
-        1 -> "one"
-        _ -> String.fromInt n
-    explanation =
-      Html.ul [] [ Html.li [] (explainPiece piece) ]
-      |> Html.map (\p -> Regex.Repeat p repetition)
-    selectedKind = repetitionKind repetition
-    kindsAndValues =
-      [ ( Optional, "optionally" )
-      , ( ZeroOrMore, "any number of" )
-      , ( OneOrMore, "at least one of" )
-      , ( Exactly, "exactly" )
-      , ( AtLeast, "at least" )
-      , ( Range, "between" )
-      ]
-    valueOf kind =
-      case List.filter (\(k, v) -> k == kind) kindsAndValues of
-        [ (_, v) ] -> v
-        _ -> ""
-    kindOf value =
-      case List.filter (\(k, v) -> v == value) kindsAndValues of
-        [ (k, _) ] -> k
-        _ -> Optional
-    repetitionOf kind =
-      let
-        bounds =
-          case repetition of
-            Regex.Optional -> { min = 0, max = 1 }
-            Regex.ZeroOrMore -> { min = 0, max = 0 }
-            Regex.OneOrMore -> { min = 1, max = 1 }
-            Regex.Exactly n -> { min = n, max = n }
-            Regex.Range { min, max } ->
-              let
-                newMin = Maybe.withDefault 0 min
-              in
-              { min = newMin
-              , max = Maybe.withDefault newMin max
-              }
-      in
-      repetitionOfKind bounds kind
-    updateRepetition rep = Regex.Repeat piece rep
-    optionOf kind =
-      Html.option
-        [ Attributes.selected (kind == selectedKind)
-        ]
-        [ Html.text (valueOf kind) ]
-    repetitionSelect =
-      Html.select
-        [ Events.onInput (\s -> updateRepetition (repetitionOf (kindOf s)))
-        ]
-        [ optionOf Optional
-        , optionOf ZeroOrMore
-        , optionOf OneOrMore
-        , optionOf Exactly
-        , optionOf AtLeast
-        , optionOf Range
-        ]
-    simple =
-      [ repetitionSelect
-      , explanation
-      ]
+    guessBounds rep =
+      case rep of
+        Regex.Optional -> { min = 0, max = 1 }
+        Regex.ZeroOrMore -> { min = 0, max = 1 }
+        Regex.OneOrMore -> { min = 1, max = 1 }
+        Regex.Exactly n -> { min = n, max = n }
+        Regex.Range { min, max } ->
+          let
+            newMin = Maybe.withDefault 0 min
+          in
+          { min = newMin
+          , max = Maybe.withDefault newMin max
+          }
   in
-  case repetition of
-    Regex.Optional -> simple
-    Regex.ZeroOrMore -> simple
-    Regex.OneOrMore -> simple
-    Regex.Exactly n ->
-      [ repetitionSelect
-      , numberField n (\m -> Regex.Exactly m)
-      , Html.text " of:"
-      , explanation
-      ]
-    Regex.Range { min, max } ->
-      case max of
-        Nothing ->
-          [ repetitionSelect
-          , numberField
-              (Maybe.withDefault 0 min)
-              (\newMin -> Regex.Range { min = Just newMin, max = max })
-          , Html.text " of:"
-          , explanation
-          ]
-        Just m ->
-          [ repetitionSelect
-          , numberField
-              (Maybe.withDefault 0 min)
-              (\newMin -> Regex.Range { min = Just newMin, max = max })
+  [ Variant.Html.ofUnit "optionally" Regex.optional
+  , Variant.Html.ofUnit "any number of" Regex.zeroOrMore
+  , Variant.Html.ofUnit "at least one of" Regex.oneOrMore
+  , Variant.Html.ofVariant
+      "exactly"
+      Regex.exactly
+      (guessBounds >> .min)
+      (\n ->
+        [ numberField n
+        , Html.text " of:"
+        ]
+      )
+  , Variant.Html.ofVariant
+      "at least"
+      Regex.atLeast
+      (guessBounds >> .min >> Just)
+      (\min ->
+        [ numberField (Maybe.withDefault 0 min)
+          |> Html.map Just
+        , Html.text " of:"
+        ]
+      )
+  , Variant.Html.ofVariant
+      "between"
+      Regex.between
+      (guessBounds >> (\{ min, max } -> (Just min, max)))
+      (\(maybeMin, max) ->
+          [ numberField (Maybe.withDefault 0 maybeMin)
+            |> Html.map (\newMin -> (Just newMin, max))
           , Html.text " and "
-          , numberField
-              m
-              (\newMax -> Regex.Range { min = min, max = Just newMax })
+          , numberField max
+            |> Html.map (\newMax -> (maybeMin, newMax))
           , Html.text " of:"
-          , explanation
           ]
+      )
+  ]
+
+
+explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
+explainRepetition piece repetition =
+  List.concat
+    [ Variant.Html.toHtml repetitionSelect repetition
+      |> List.map (Html.map (\rep -> Regex.Repeat piece rep))
+    , [ Html.ul [] [ Html.li [] (explainPiece piece) ]
+        |> Html.map (\p -> Regex.Repeat p repetition)
+      ]
+    ]
