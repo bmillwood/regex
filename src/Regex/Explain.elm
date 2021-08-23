@@ -13,11 +13,44 @@ import Zipper
 explainRegex : Regex -> Html Regex
 explainRegex regex = Html.p [] (explainDisjuncts regex)
 
-list : (a -> Html a) -> List a -> List (Html (List a))
-list f xs =
+type EditListItem a
+  = Set a
+  | Duplicate
+  | Delete
+
+duplicateButton : Html (EditListItem a)
+duplicateButton =
+  Html.button [ Events.onClick Duplicate ] [ Html.text "+" ]
+
+deleteButton : { disabled : Bool } -> Html (EditListItem a)
+deleteButton { disabled } =
+  Html.button
+    [ Attributes.disabled disabled
+    , Events.onClick Delete
+    ]
+    [ Html.text "-" ]
+
+editableList : (a -> Html (EditListItem a)) -> List a -> List (Html (List a))
+editableList f xs =
   List.map
-    (\(b, x, a) -> Html.map (\y -> Zipper.toList (b, y, a)) (f x))
+    (\(b, x, a) ->
+      Html.map
+        (\y ->
+          case y of
+            Set z -> Zipper.toList (b, z, a)
+            Duplicate -> Zipper.toList (x :: b, x, a)
+            Delete ->
+              case (b, a) of
+                (z :: bb, _) -> Zipper.toList (bb, z, a)
+                (_, z :: aa) -> Zipper.toList (b, z, aa)
+                ([], []) -> []
+        )
+        (f x)
+    )
     (Zipper.ofList xs)
+
+list : (a -> Html a) -> List a -> List (Html (List a))
+list f xs = editableList (Html.map Set << f) xs
 
 single : (a -> List (Html a)) -> a -> List (Html (List a))
 single f x = List.map (Html.map (\y -> [ y ])) (f x)
@@ -156,7 +189,13 @@ classAtomSelect =
 explainMatchClass : { negated : Bool, matchAtoms : List Regex.ClassAtom } -> List (Html Regex.CharMatch)
 explainMatchClass ({ negated, matchAtoms } as matchClass) =
   let
-    ofAtom ca = Html.li [] (Variant.Html.toHtml classAtomSelect ca)
+    ofAtom ca =
+      Html.li
+        []
+        (duplicateButton
+        :: deleteButton { disabled = List.length matchAtoms <= 1 }
+        :: List.map (Html.map Set) (Variant.Html.toHtml classAtomSelect ca)
+        )
     setNegated newNegated = Regex.MatchClass { matchClass | negated = newNegated }
     setAtoms newAtoms = Regex.MatchClass { matchClass | matchAtoms = newAtoms }
   in
@@ -169,7 +208,7 @@ explainMatchClass ({ negated, matchAtoms } as matchClass) =
       negated
     |> List.map (Html.map setNegated)
   , [ Html.text " of:"
-    , Html.ul [] (list ofAtom matchAtoms)
+    , Html.ul [] (editableList ofAtom matchAtoms)
       |> Html.map setAtoms
     ]
   ]
