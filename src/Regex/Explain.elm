@@ -93,8 +93,8 @@ explainPiece piece =
     Regex.EndOfInput -> [ Html.text "the end of the string" ]
     Regex.CharMatching cm -> explainCharMatch cm
     Regex.Capture r -> List.map (Html.map Regex.Capture) (explainDisjuncts r)
-    Regex.Repeat repetition unit ->
-      explainRepetition repetition unit
+    Regex.Repeat unit repetition ->
+      explainRepetition unit repetition
 
 explainCharMatch : Regex.CharMatch -> List (Html a)
 explainCharMatch match =
