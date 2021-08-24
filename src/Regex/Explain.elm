@@ -66,26 +66,33 @@ explainDisjuncts : Regex -> List (Html Regex)
 explainDisjuncts ds =
   case ds of
     [] -> [ Html.text "empty regex (matches nothing)" ]
-    [ d ] -> editableOne explainDisjunct d
+    [ d ] -> editableOne (explainDisjunct { disableDelete = True }) d
     _ ->
       [ Html.text "any of:"
-      , Html.ul [] (editableList (Html.li [] << explainDisjunct) ds)
+      , Html.ul [] (editableList (Html.li [] << explainDisjunct { disableDelete = False }) ds)
       ]
 
-explainDisjunct : List Regex.Piece -> List (Html (EditListItem (List Regex.Piece)))
-explainDisjunct pieces =
+explainDisjunct
+  :  { disableDelete : Bool }
+  -> List Regex.Piece -> List (Html (EditListItem (List Regex.Piece)))
+explainDisjunct { disableDelete } pieces =
   let
-    insertAnyButton =
+    insertDisjunctButton = Html.button [ Events.onClick (Insert []) ] [ Html.text "|" ]
+    createSequenceButtons =
+      [ Html.button [ Events.onClick (Insert arbitrary) ] [ Html.text "..." ] ]
+    extendSequenceButtons =
+      [ Html.button [ Events.onClick (Insert arbitrary) ] [ Html.text "+" ]
+      , deleteButton { disabled = False }
+      ]
+    arbitrary =
       -- can't duplicate the current node because Literals nodes can't be
       -- adjacent to each other, so insert some arbitrary node
-      insertButton (Other (Regex.CharMatching Regex.MatchAny))
+      Other (Regex.CharMatching Regex.MatchAny)
     explainSqueezed : Squeezed -> List (Html (EditListItem Squeezed))
     explainSqueezed squeezed =
       case squeezed of
         Literals s ->
-          [ insertAnyButton
-          , deleteButton { disabled = False }
-          , Html.text " the string "
+          [ Html.text "the string "
           , Html.input
               [ Attributes.type_ "text"
               , Attributes.value s
@@ -95,21 +102,25 @@ explainDisjunct pieces =
               []
           ]
         Other piece ->
-          insertAnyButton
-          :: deleteButton { disabled = False }
-          :: List.map (Html.map (Set << Other)) (explainPiece piece)
+          List.map (Html.map (Set << Other)) (explainPiece piece)
     unsqueezes = List.map (Html.map (Set << List.concatMap unsqueeze))
   in
-  case squeeze pieces of
+  insertDisjunctButton
+  :: deleteButton { disabled = disableDelete }
+  :: case squeeze pieces of
     [] -> [ Html.text "the empty string" ]
-    [ squeezed ] -> unsqueezes (editableOne explainSqueezed squeezed)
+    [ squeezed ] ->
+      editableOne
+        (List.append createSequenceButtons << explainSqueezed)
+        squeezed
+      |> unsqueezes
     squeezeds ->
       [ Html.text "a sequence of:"
       , Html.ul
           []
           (unsqueezes
           <| editableList
-              (Html.li [] << explainSqueezed)
+              (Html.li [] << List.append extendSequenceButtons << explainSqueezed)
               squeezeds
           )
       ]
