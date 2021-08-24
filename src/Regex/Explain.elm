@@ -15,12 +15,12 @@ explainRegex regex = Html.p [] (explainDisjuncts regex)
 
 type EditListItem a
   = Set a
-  | Duplicate
+  | Insert a
   | Delete
 
-duplicateButton : Html (EditListItem a)
-duplicateButton =
-  Html.button [ Events.onClick Duplicate ] [ Html.text "+" ]
+insertButton : a -> Html (EditListItem a)
+insertButton a =
+  Html.button [ Events.onClick (Insert a) ] [ Html.text "+" ]
 
 deleteButton : { disabled : Bool } -> Html (EditListItem a)
 deleteButton { disabled } =
@@ -38,7 +38,7 @@ editableList f xs =
         (\y ->
           case y of
             Set z -> Zipper.toList (b, z, a)
-            Duplicate -> Zipper.toList (x :: b, x, a)
+            Insert z -> Zipper.toList (z :: b, x, a)
             Delete ->
               case (b, a) of
                 (z :: bb, _) -> Zipper.toList (bb, z, a)
@@ -49,49 +49,69 @@ editableList f xs =
     )
     (Zipper.ofList xs)
 
-list : (a -> Html a) -> List a -> List (Html (List a))
-list f xs = editableList (Html.map Set << f) xs
-
-single : (a -> List (Html a)) -> a -> List (Html (List a))
-single f x = List.map (Html.map (\y -> [ y ])) (f x)
+editableOne : (a -> List (Html (EditListItem a))) -> a -> List (Html (List a))
+editableOne f x =
+  List.map
+    (Html.map
+      (\y ->
+        case y of
+          Set z -> [ z ]
+          Insert z -> [ z, x ]
+          Delete -> []
+      )
+    )
+    (f x)
 
 explainDisjuncts : Regex -> List (Html Regex)
 explainDisjuncts ds =
   case ds of
     [] -> [ Html.text "empty regex (matches nothing)" ]
-    [ d ] -> single explainDisjunct d
+    [ d ] -> editableOne explainDisjunct d
     _ ->
       [ Html.text "any of:"
-      , Html.ul [] (list (Html.li [] << explainDisjunct) ds)
+      , Html.ul [] (editableList (Html.li [] << explainDisjunct) ds)
       ]
 
-explainDisjunct : List Regex.Piece -> List (Html (List Regex.Piece))
+explainDisjunct : List Regex.Piece -> List (Html (EditListItem (List Regex.Piece)))
 explainDisjunct pieces =
   let
-    explainSqueezed : Squeezed -> List (Html Squeezed)
+    insertAnyButton =
+      -- can't duplicate the current node because Literals nodes can't be
+      -- adjacent to each other, so insert some arbitrary node
+      insertButton (Other (Regex.CharMatching Regex.MatchAny))
+    explainSqueezed : Squeezed -> List (Html (EditListItem Squeezed))
     explainSqueezed squeezed =
       case squeezed of
         Literals s ->
-          [ Html.text "the string "
+          [ insertAnyButton
+          , deleteButton { disabled = False }
+          , Html.text " the string "
           , Html.input
               [ Attributes.type_ "text"
               , Attributes.value s
-              , Events.onInput Literals
+              , Events.onInput (Set << Literals)
               , Attributes.style "width" (String.fromInt (String.length s) ++ "em")
               ]
               []
           ]
-        Other piece -> List.map (Html.map Other) (explainPiece piece)
-    unsqueezes = List.map (Html.map (List.concatMap unsqueeze))
+        Other piece ->
+          insertAnyButton
+          :: deleteButton { disabled = False }
+          :: List.map (Html.map (Set << Other)) (explainPiece piece)
+    unsqueezes = List.map (Html.map (Set << List.concatMap unsqueeze))
   in
   case squeeze pieces of
     [] -> [ Html.text "the empty string" ]
-    [ squeezed ] -> unsqueezes (single explainSqueezed squeezed)
+    [ squeezed ] -> unsqueezes (editableOne explainSqueezed squeezed)
     squeezeds ->
       [ Html.text "a sequence of:"
       , Html.ul
           []
-          (unsqueezes (list (Html.li [] << explainSqueezed) squeezeds))
+          (unsqueezes
+          <| editableList
+              (Html.li [] << explainSqueezed)
+              squeezeds
+          )
       ]
 
 type Squeezed
@@ -192,7 +212,7 @@ explainMatchClass ({ negated, matchAtoms } as matchClass) =
     ofAtom ca =
       Html.li
         []
-        (duplicateButton
+        (insertButton ca
         :: deleteButton { disabled = List.length matchAtoms <= 1 }
         :: List.map (Html.map Set) (Variant.Html.toHtml classAtomSelect ca)
         )
