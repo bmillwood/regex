@@ -42,10 +42,14 @@ reflected in the regular expression input.
 
 ## Related work
 
-These tools all have the capacity to accept regular expressions, highlight and
+* These tools all have the capacity to accept regular expressions, highlight and
 describe syntax components, and show matches in some text, along with capture
 groups:
-
-* [RegExr](https://regexr.com/)
-* [RegEx101](https://regex101.com/)
-* [RegEx Testing](https://regex101.com/)
+    * [RegExr](https://regexr.com/)
+    * [RegEx101](https://regex101.com/)
+    * [RegEx Testing](https://regex101.com/)
+* [The Regular Expression Visualizer, Simulator & Cross-Compiler
+Tool](https://blog.robertelder.org/regular-expression-visualizer) has a thing
+for drawing a parse tree of the regular expression, a DFA compilation, and a C
+code implementation. It also has the ability to generate a random matching
+string.
