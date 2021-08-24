@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Html.Attributes as Attributes
 import Html.Events as Events
 import Parser
+import Url.Builder
 
 import Regex exposing (Regex)
 import Regex.Explain
@@ -41,11 +42,21 @@ view model =
     inputAttributes =
       [ Attributes.type_ "text"
       , Attributes.value model.unparsed
+      , Attributes.placeholder "regular expression"
       , Events.onInput SetInput
       ] ++ maybeStyle
   in
   Html.div []
-    [ Html.p [] [ Html.input inputAttributes [] ]
+    [ Html.p
+        []
+        [ Html.input inputAttributes []
+        , Html.text " "
+        , Html.a
+            [ Attributes.href
+              <| Url.Builder.relative [] [ Url.Builder.string "init" model.unparsed ]
+            ]
+            [ Html.text "link to this regex" ]
+        ]
     , Html.p [] [ Html.map SetRegex (Regex.Explain.explainRegex model.lastParsed) ]
     , Html.p
         []
