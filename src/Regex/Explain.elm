@@ -123,14 +123,10 @@ type Squeezed
   = Literals String
   | Other Regex.Piece
 
-emptyString : Variant Squeezed ()
-emptyString = Variant.unit (Literals "")
-
 literals : Variant Squeezed String
 literals =
   { match = \s ->
       case s of
-        Literals "" -> Nothing
         Literals l -> Just l
         _ -> Nothing
   , make = Literals
@@ -147,8 +143,7 @@ other =
 
 squeezedSelect : Variant.Html.Select Squeezed
 squeezedSelect =
-  [ Variant.Html.ofUnit "the empty string" emptyString
-  , Variant.Html.ofVariant
+  [ Variant.Html.ofVariant
       "the string"
       literals
       (always "a")
@@ -158,7 +153,9 @@ squeezedSelect =
             [ Attributes.type_ "text"
             , Attributes.value s
             , Events.onInput identity
-            , Attributes.style "width" (String.fromInt (String.length s) ++ "em")
+            , Attributes.style
+                "width"
+                (String.fromInt (max 1 (String.length s)) ++ "em")
             ]
             []
         ]
