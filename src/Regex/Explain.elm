@@ -179,7 +179,7 @@ pieceSelect =
       (always { negated = False, matchAtoms = [ Regex.ClassLit 'a' ] })
       explainMatchClass
   , Variant.Html.ofVariant
-      "the captured result of"
+      "[capture group]"
       Regex.capture
       (always Regex.empty)
       explainDisjuncts
