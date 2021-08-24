@@ -17,10 +17,64 @@ type Piece
   | Capture Regex
   | Repeat Piece Repetition
 
+startOfInput : Variant Piece ()
+startOfInput = Variant.unit StartOfInput
+
+endOfInput : Variant Piece ()
+endOfInput = Variant.unit EndOfInput
+
+charMatching : Variant Piece CharMatch
+charMatching =
+  { match = \p ->
+      case p of
+        CharMatching m -> Just m
+        _ -> Nothing
+  , make = CharMatching
+  }
+
+capture : Variant Piece Regex
+capture =
+  { match = \p ->
+      case p of
+        Capture m -> Just m
+        _ -> Nothing
+  , make = Capture
+  }
+
+repeat : Variant Piece (Piece, Repetition)
+repeat =
+  { match = \p ->
+      case p of
+        Repeat i r -> Just (i, r)
+        _ -> Nothing
+  , make = \(p, r) -> Repeat p r
+  }
+
 type CharMatch
   = MatchLit Char
   | MatchAny
   | MatchClass { negated : Bool, matchAtoms : List ClassAtom }
+
+matchLit : Variant CharMatch Char
+matchLit =
+  { match = \cm ->
+      case cm of
+        MatchLit c -> Just c
+        _ -> Nothing
+  , make = MatchLit
+  }
+
+matchAny : Variant CharMatch ()
+matchAny = Variant.unit MatchAny
+
+matchClass : Variant CharMatch { negated : Bool, matchAtoms : List ClassAtom }
+matchClass =
+  { match = \cm ->
+      case cm of
+        MatchClass c -> Just c
+        _ -> Nothing
+  , make = MatchClass
+  }
 
 type ClassAtom
   = ClassLit Char

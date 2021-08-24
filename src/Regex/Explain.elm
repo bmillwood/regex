@@ -6,7 +6,7 @@ import Html.Events as Events
 import Parser
 
 import Regex exposing (Regex)
-import Variant
+import Variant exposing (Variant)
 import Variant.Html
 import Zipper
 
@@ -88,46 +88,107 @@ explainDisjunct { disableDelete } pieces =
       -- can't duplicate the current node because Literals nodes can't be
       -- adjacent to each other, so insert some arbitrary node
       Other (Regex.CharMatching Regex.MatchAny)
-    explainSqueezed : Squeezed -> List (Html (EditListItem Squeezed))
-    explainSqueezed squeezed =
-      case squeezed of
-        Literals s ->
-          [ Html.text "the string "
-          , Html.input
-              [ Attributes.type_ "text"
-              , Attributes.value s
-              , Events.onInput (Set << Literals)
-              , Attributes.style "width" (String.fromInt (String.length s) ++ "em")
-              ]
-              []
-          ]
-        Other piece ->
-          List.map (Html.map (Set << Other)) (explainPiece piece)
     unsqueezes = List.map (Html.map (Set << List.concatMap unsqueeze))
+    one squeezed =
+      editableOne
+        (List.append createSequenceButtons << List.map (Html.map Set) << explainSqueezed)
+        squeezed
+      |> unsqueezes
   in
   insertDisjunctButton
   :: deleteButton { disabled = disableDelete }
   :: case squeeze pieces of
-    [] -> [ Html.text "the empty string" ]
-    [ squeezed ] ->
-      editableOne
-        (List.append createSequenceButtons << explainSqueezed)
-        squeezed
-      |> unsqueezes
+    [] -> one (Literals "")
+    [ squeezed ] -> one squeezed
     squeezeds ->
       [ Html.text "a sequence of:"
       , Html.ul
           []
           (unsqueezes
           <| editableList
-              (Html.li [] << List.append extendSequenceButtons << explainSqueezed)
+              (Html.li []
+                << List.append extendSequenceButtons
+                << List.map (Html.map Set)
+                << explainSqueezed
+              )
               squeezeds
           )
       ]
 
+explainSqueezed : Squeezed -> List (Html Squeezed)
+explainSqueezed squeezed =
+  Variant.Html.toHtml squeezedSelect squeezed
+
 type Squeezed
   = Literals String
   | Other Regex.Piece
+
+emptyString : Variant Squeezed ()
+emptyString = Variant.unit (Literals "")
+
+literals : Variant Squeezed String
+literals =
+  { match = \s ->
+      case s of
+        Literals "" -> Nothing
+        Literals l -> Just l
+        _ -> Nothing
+  , make = Literals
+  }
+
+other : Variant Squeezed Regex.Piece
+other =
+  { match = \s ->
+      case s of
+        Other p -> Just p
+        _ -> Nothing
+  , make = Other
+  }
+
+squeezedSelect : Variant.Html.Select Squeezed
+squeezedSelect =
+  [ Variant.Html.ofUnit "the empty string" emptyString
+  , Variant.Html.ofVariant
+      "the string"
+      literals
+      (always "a")
+      (\s ->
+        [ Html.text " "
+        , Html.input
+            [ Attributes.type_ "text"
+            , Attributes.value s
+            , Events.onInput identity
+            , Attributes.style "width" (String.fromInt (String.length s) ++ "em")
+            ]
+            []
+        ]
+      )
+  ] ++ List.map (Variant.Html.subOption other) pieceSelect
+
+pieceSelect : Variant.Html.Select Regex.Piece
+pieceSelect =
+  [ Variant.Html.ofUnit "the start of input" Regex.startOfInput
+  , Variant.Html.ofUnit "the end of input" Regex.endOfInput
+  -- MatchLit deliberately omitted
+  , Variant.Html.ofUnit
+      "any character"
+      (Variant.compose Regex.charMatching Regex.matchAny)
+  , Variant.Html.ofVariant
+      "a character that is"
+      (Variant.compose Regex.charMatching Regex.matchClass)
+      (always { negated = False, matchAtoms = [ Regex.ClassLit 'a' ] })
+      explainMatchClass
+  , Variant.Html.ofVariant
+      "the captured result of"
+      Regex.capture
+      (always Regex.empty)
+      explainDisjuncts
+  , Variant.Html.ofVariant
+      "[repetition]"
+      Regex.repeat
+      (always (Regex.CharMatching Regex.MatchAny, Regex.ZeroOrMore))
+      explainRepetition
+  ]
 
 squeeze : List Regex.Piece -> List Squeezed
 squeeze =
@@ -138,8 +199,8 @@ squeeze =
           Literals (String.cons c s) :: rest
         (Regex.CharMatching (Regex.MatchLit c), others) ->
           Literals (String.fromChar c) :: others
-        (other, others) ->
-          Other other :: others
+        (otherP, others) ->
+          Other otherP :: others
   in
   List.foldr f []
 
@@ -151,26 +212,6 @@ unsqueeze sq =
         (\c -> Regex.CharMatching (Regex.MatchLit c))
         (String.toList s)
     Other p -> [ p ]
-
-explainPiece : Regex.Piece -> List (Html Regex.Piece)
-explainPiece piece =
-  case piece of
-    Regex.StartOfInput -> [ Html.text "the start of the string" ]
-    Regex.EndOfInput -> [ Html.text "the end of the string" ]
-    Regex.CharMatching cm -> List.map (Html.map Regex.CharMatching) (explainCharMatch cm)
-    Regex.Capture r -> List.map (Html.map Regex.Capture) (explainDisjuncts r)
-    Regex.Repeat unit repetition ->
-      explainRepetition unit repetition
-
-explainCharMatch : Regex.CharMatch -> List (Html Regex.CharMatch)
-explainCharMatch match =
-  case match of
-    Regex.MatchLit c ->
-      -- NB. despite squeeze, this case is reachable, because
-      -- we only bother squeezing when we have a sequence
-      [ Html.text ("the character " ++ Debug.toString c) ]
-    Regex.MatchAny -> [ Html.text "any character" ]
-    Regex.MatchClass class -> explainMatchClass class
 
 classAtomSelect : Variant.Html.Select Regex.ClassAtom
 classAtomSelect =
@@ -217,7 +258,9 @@ classAtomSelect =
       )
   ]
 
-explainMatchClass : { negated : Bool, matchAtoms : List Regex.ClassAtom } -> List (Html Regex.CharMatch)
+explainMatchClass
+  :  { negated : Bool, matchAtoms : List Regex.ClassAtom }
+  -> List (Html { negated : Bool, matchAtoms : List Regex.ClassAtom })
 explainMatchClass ({ negated, matchAtoms } as matchClass) =
   let
     ofAtom ca =
@@ -227,22 +270,21 @@ explainMatchClass ({ negated, matchAtoms } as matchClass) =
         :: deleteButton { disabled = List.length matchAtoms <= 1 }
         :: List.map (Html.map Set) (Variant.Html.toHtml classAtomSelect ca)
         )
-    setNegated newNegated = Regex.MatchClass { matchClass | negated = newNegated }
-    setAtoms newAtoms = Regex.MatchClass { matchClass | matchAtoms = newAtoms }
+    setNegated newNegated = { matchClass | negated = newNegated }
+    setAtoms newAtoms = { matchClass | matchAtoms = newAtoms }
   in
   List.concat
-  [ [ Html.text "a character that is " ]
-  , Variant.Html.toHtml
-      [ Variant.Html.ofUnit "any" (Variant.unit False)
-      , Variant.Html.ofUnit "none" (Variant.unit True)
+    [ Variant.Html.toHtml
+        [ Variant.Html.ofUnit "any" (Variant.unit False)
+        , Variant.Html.ofUnit "none" (Variant.unit True)
+        ]
+        negated
+      |> List.map (Html.map setNegated)
+    , [ Html.text " of:"
+      , Html.ul [] (editableList ofAtom matchAtoms)
+        |> Html.map setAtoms
       ]
-      negated
-    |> List.map (Html.map setNegated)
-  , [ Html.text " of:"
-    , Html.ul [] (editableList ofAtom matchAtoms)
-      |> Html.map setAtoms
     ]
-  ]
 
 partitionClassAtoms
   : List Regex.ClassAtom -> (List Char, List (Char, Char))
@@ -322,13 +364,23 @@ repetitionSelect =
       )
   ]
 
+explainRepetition : (Regex.Piece, Regex.Repetition) -> List (Html (Regex.Piece, Regex.Repetition))
+explainRepetition (piece, repetition) =
+  let
+    explainPiece =
+      squeeze [ piece ]
+      |> List.concatMap explainSqueezed
+      |> List.map (Html.map squeezedToPiece)
 
-explainRepetition : Regex.Piece -> Regex.Repetition -> List (Html Regex.Piece)
-explainRepetition piece repetition =
+    squeezedToPiece sq =
+      case unsqueeze sq of
+        [ only ] -> only
+        pieces -> Regex.Capture [ pieces ]
+  in
   List.concat
     [ Variant.Html.toHtml repetitionSelect repetition
-      |> List.map (Html.map (\rep -> Regex.Repeat piece rep))
-    , [ Html.ul [] [ Html.li [] (explainPiece piece) ]
-        |> Html.map (\p -> Regex.Repeat p repetition)
+      |> List.map (Html.map (\rep -> (piece, rep)))
+    , [ Html.ul [] [ Html.li [] explainPiece ]
+        |> Html.map (\p -> (p, repetition))
       ]
     ]
