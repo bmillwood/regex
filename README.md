@@ -42,6 +42,10 @@ reflected in the regular expression input.
 
 ## Related work
 
-* [RegExr](https://regexr.com/) does English explanations of regexes. They're
-  more comprehensive and the UI is very pretty but the explanations aren't
-  editable (and they don't do any of my planned features).
+These tools all have the capacity to accept regular expressions, highlight and
+describe syntax components, and show matches in some text, along with capture
+groups:
+
+* [RegExr](https://regexr.com/)
+* [RegEx101](https://regex101.com/)
+* [RegEx Testing](https://regex101.com/)
